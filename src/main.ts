@@ -3,9 +3,9 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
 import * as compression from 'compression';
 import { StructuredLogger } from './shared/logging/logging.config';
+import { configureSecurity } from './config/security.config';
 
 async function bootstrap(): Promise<void> {
   const appLogger = new StructuredLogger();
@@ -15,18 +15,11 @@ async function bootstrap(): Promise<void> {
       logger: appLogger,
     });
 
-    // Security headers
-    app.use(helmet());
+    // Security headers and CORS
+    configureSecurity(app);
 
     // Response compression
     app.use(compression());
-
-    // CORS
-    app.enableCors({
-      origin: process.env.CORS_ORIGIN || '*',
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      credentials: true,
-    });
 
     // Global validation pipes
     app.useGlobalPipes(
