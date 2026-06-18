@@ -11,6 +11,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Full repository scan
+        uses: zricethezav/gitleaks-action@v1
+        with:
+          config-path: .gitleaks.toml
+      - name: Pull request diff scan
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo \
+            --config=/repo/.gitleaks.toml \
+            --redact \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
