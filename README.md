@@ -193,6 +193,10 @@ Query Parameters:
 | `THROTTLE_TTL`                | Rate limit window (ms)       | `60000`                                      |
 | `THROTTLE_LIMIT`              | Rate limit max requests      | `100`                                        |
 
+## Status
+
+Check our public status page at [status.stellartip.com](https://status.stellartip.com) for real-time monitoring of API health, database connectivity, and Stellar Horizon availability. You can subscribe to incident updates via email or RSS.
+
 ## API Documentation
 
 Interactive Swagger UI is available at `/api/docs` when the server is running.
