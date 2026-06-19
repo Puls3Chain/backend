@@ -118,3 +118,41 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  api-diff:
+    name: API Diff
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Fetch main snapshot
+        run: |
+          git fetch origin main
+          mkdir -p docs/openapi
+          git show origin/main:docs/openapi/latest.json > docs/openapi/previous.json || true
+      - name: Generate current OpenAPI spec
+        run: npm run api:spec
+      - name: Run openapi-diff
+        run: npx openapi-diff docs/openapi/previous.json docs/openapi/current.json > api-diff.txt || true
+      - name: Check for breaking changes
+        shell: bash
+        run: |
+          if grep -E 'Incompatible|Removed|ERROR|ERROR:' api-diff.txt; then
+            echo "Detected potentially breaking API changes." >&2
+            PR_BODY="${{ github.event.pull_request.body }}"
+            if echo "$PR_BODY" | grep -qiE 'api-breaking-change|BREAKING CHANGE'; then
+              echo "Breaking change acknowledged in PR body"
+            else
+              echo "Breaking API changes detected but not documented in PR." >&2
+              cat api-diff.txt >&2
+              exit 1
+            fi
+          else
+            echo "No breaking API changes detected."
+          fi

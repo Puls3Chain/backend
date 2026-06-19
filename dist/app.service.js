@@ -9,8 +9,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppService = void 0;
 const common_1 = require("@nestjs/common");
 let AppService = class AppService {
+    apiVersion = '0.1.0';
     getHello() {
-        return 'StellarTip API — Decentralized micro-tipping on Stellar';
+        return `StellarTip API v${this.apiVersion} — Decentralized micro-tipping on Stellar`;
+    }
+    getVersion() {
+        return this.apiVersion;
     }
 };
 exports.AppService = AppService;

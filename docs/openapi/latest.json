@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "StellarTip API",
+    "version": "0.1.0",
+    "description": "Latest known API snapshot"
+  },
+  "paths": {}
+}

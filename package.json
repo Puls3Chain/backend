@@ -19,6 +19,10 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepare": "husky"
+    ,
+    "api:spec": "ts-node --transpile-only -r tsconfig-paths/register scripts/generate-openapi.ts",
+    "api:update-changelog": "ts-node --transpile-only -r tsconfig-paths/register scripts/update-api-changelog.ts",
+    "api:diff": "npx openapi-diff docs/openapi/previous.json docs/openapi/current.json || true"
   },
   "lint-staged": {
     "*.ts": [

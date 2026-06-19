@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import { StructuredLogger } from './shared/logging/logging.config';
@@ -41,13 +43,32 @@ async function bootstrap(): Promise<void> {
     );
 
     // Swagger / OpenAPI documentation
+    let changelogNote = '';
+    try {
+      const changelogPath = join(__dirname, '..', 'docs', 'API_CHANGELOG.md');
+      if (existsSync(changelogPath)) {
+        const changelog = readFileSync(changelogPath, 'utf8');
+        const m = changelog.match(/^##\s*v?(\d+\.\d+\.\d+)/m);
+        const latest = m ? m[1] : null;
+        const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+        const version = pkg.version;
+        if (latest && version !== latest) {
+          changelogNote = `\n\n**Note:** This instance is running v${version} — a newer API version (v${latest}) exists. See /docs/API_CHANGELOG.md for details.`;
+        }
+      }
+    } catch (err) {
+      // swallow any errors reading changelog/package
+    }
+
+    const baseDescription =
+      'Decentralized micro-tipping platform on the Stellar blockchain. ' +
+      'Tip creators with XLM or USDC — no intermediaries, just Stellar.';
+
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
     const config = new DocumentBuilder()
       .setTitle('StellarTip API')
-      .setDescription(
-        'Decentralized micro-tipping platform on the Stellar blockchain. ' +
-          'Tip creators with XLM or USDC — no intermediaries, just Stellar.',
-      )
-      .setVersion('0.1.0')
+      .setDescription(baseDescription + changelogNote)
+      .setVersion(pkg.version || '0.0.0')
       .addBearerAuth()
       .addTag('auth', 'Authentication endpoints')
       .addTag('profiles', 'Creator profile management')

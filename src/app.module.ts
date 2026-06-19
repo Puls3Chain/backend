@@ -30,6 +30,11 @@ import { SharedModule } from './shared/shared.module';
       serveRoot: '/uploads',
       serveStaticOptions: { index: false },
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'docs'),
+      serveRoot: '/docs',
+      serveStaticOptions: { index: false },
+    }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     AuthModule,
     TipsModule,

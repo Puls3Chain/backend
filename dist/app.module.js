@@ -14,6 +14,7 @@ const serve_static_1 = require("@nestjs/serve-static");
 const path_1 = require("path");
 const throttler_1 = require("@nestjs/throttler");
 const core_1 = require("@nestjs/core");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const typeorm_config_1 = require("./config/typeorm.config");
@@ -23,6 +24,7 @@ const profiles_module_1 = require("./profiles/profiles.module");
 const stellar_module_1 = require("./stellar/stellar.module");
 const notifications_module_1 = require("./notifications/notifications.module");
 const health_module_1 = require("./health/health.module");
+const shared_module_1 = require("./shared/shared.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -39,12 +41,21 @@ exports.AppModule = AppModule = __decorate([
                 serveRoot: '/uploads',
                 serveStaticOptions: { index: false },
             }),
+            throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
             auth_module_1.AuthModule,
             tips_module_1.TipsModule,
             profiles_module_1.ProfilesModule,
             stellar_module_1.StellarModule,
             notifications_module_1.NotificationsModule,
             health_module_1.HealthModule,
+            shared_module_1.SharedModule,
+            cache_manager_1.CacheModule.registerAsync({
+                isGlobal: true,
+                useFactory: () => ({
+                    ttl: 300000,
+                    max: 100,
+                }),
+            }),
         ],
         controllers: [app_controller_1.AppController],
         providers: [
