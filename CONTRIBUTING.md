@@ -8,6 +8,23 @@
 4. Copy environment variables: `cp .env.example .env`
 5. Start the dev server: `npm run start:dev`
 
+## Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by Commitlint and Husky.
+
+Use one of these types as a prefix:
+
+| Type       | Semver bump | Example                                 |
+| ---------- | ----------- | --------------------------------------- |
+| `feat`     | minor       | `feat: add creator analytics export`    |
+| `fix`      | patch       | `fix: handle expired refresh tokens`    |
+| `perf`     | patch       | `perf: cache profile lookups`           |
+| `refactor` | patch       | `refactor: simplify tip validation`     |
+| `docs`     | none        | `docs: document analytics query params` |
+| `chore`    | none        | `chore: bump eslint dependencies`       |
+
+Breaking changes must include `BREAKING CHANGE:` in the commit body or use a `!` after the type (e.g. `feat!: remove legacy auth endpoint`).
+
 ## Code Quality
 
 ### Linting
@@ -56,7 +73,7 @@ All new features should include unit tests. Aim for >85% coverage on service fil
 2. Make your changes
 3. Run `npm run lint` and fix any issues
 4. Run `npm test` and ensure all tests pass
-5. Commit with a descriptive message
+5. Commit with a [Conventional Commit](#commit-messages) message
 6. Push and create a pull request
 
 ## Architecture Decision Records (ADRs)
@@ -67,6 +84,44 @@ We use ADRs to document important architectural decisions. These records are loc
 - **Format**: Follow the [Michael Nygard format](https://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions).
 - **Immutability**: Once an ADR is accepted, it is immutable. To change a decision, create a new ADR that supersedes the old one.
 - **Naming**: Use `NNNN-short-title.md` (e.g., `0008-use-redis-for-caching.md`).
+
+## Releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please) and follow [Semantic Versioning](https://semver.org/).
+
+### How it works
+
+1. Merge conventional commits to `main`.
+2. **Release Please** opens (or updates) a release PR that bumps `package.json`, updates `CHANGELOG.md`, and prepares the next version.
+3. Merging the release PR creates a GitHub release, a `vX.Y.Z` tag, and release notes from the changelog.
+4. Pushing the tag triggers the **Release** workflow (`.github/workflows/release.yml`), which:
+   - Verifies database migrations against a clean PostgreSQL instance
+   - Builds and publishes Docker images to `ghcr.io/stellartip/backend:vX.Y.Z` and `:latest`
+5. Production containers run pending migrations automatically on startup via `scripts/docker-entrypoint.sh`.
+
+### Version bumps
+
+| Commit type                         | Version bump |
+| ----------------------------------- | ------------ |
+| `fix`, `perf`, `refactor` (default) | patch        |
+| `feat`                              | minor        |
+| `BREAKING CHANGE` or `type!`        | major        |
+
+### Database migrations
+
+Generate a migration after entity changes:
+
+```bash
+npm run migration:generate -- src/migrations/DescriptiveName
+```
+
+Apply migrations locally:
+
+```bash
+npm run migration:run
+```
+
+The release workflow runs `migration:run` against a fresh database before publishing images to verify a safe migration path.
 
 ## Project Structure
 
