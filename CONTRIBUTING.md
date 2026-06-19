@@ -59,6 +59,15 @@ All new features should include unit tests. Aim for >85% coverage on service fil
 5. Commit with a descriptive message
 6. Push and create a pull request
 
+## Architecture Decision Records (ADRs)
+
+We use ADRs to document important architectural decisions. These records are located in the `docs/adr/` directory.
+
+- **Process**: When making a significant architectural change, propose it via a new ADR.
+- **Format**: Follow the [Michael Nygard format](https://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions).
+- **Immutability**: Once an ADR is accepted, it is immutable. To change a decision, create a new ADR that supersedes the old one.
+- **Naming**: Use `NNNN-short-title.md` (e.g., `0008-use-redis-for-caching.md`).
+
 ## Project Structure
 
 ```
