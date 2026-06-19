@@ -50,13 +50,15 @@ async function bootstrap(): Promise<void> {
         const changelog = readFileSync(changelogPath, 'utf8');
         const m = changelog.match(/^##\s*v?(\d+\.\d+\.\d+)/m);
         const latest = m ? m[1] : null;
-        const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
-        const version = pkg.version;
+        const pkgJson = JSON.parse(
+          readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+        ) as { version?: string };
+        const version = pkgJson.version ?? '0.0.0';
         if (latest && version !== latest) {
           changelogNote = `\n\n**Note:** This instance is running v${version} — a newer API version (v${latest}) exists. See /docs/API_CHANGELOG.md for details.`;
         }
       }
-    } catch (err) {
+    } catch {
       // swallow any errors reading changelog/package
     }
 
@@ -64,11 +66,13 @@ async function bootstrap(): Promise<void> {
       'Decentralized micro-tipping platform on the Stellar blockchain. ' +
       'Tip creators with XLM or USDC — no intermediaries, just Stellar.';
 
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    ) as { version?: string };
     const config = new DocumentBuilder()
       .setTitle('StellarTip API')
       .setDescription(baseDescription + changelogNote)
-      .setVersion(pkg.version || '0.0.0')
+      .setVersion(pkg.version ?? '0.0.0')
       .addBearerAuth()
       .addTag('auth', 'Authentication endpoints')
       .addTag('profiles', 'Creator profile management')

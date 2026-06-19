@@ -138,8 +138,13 @@ jobs:
           git show origin/main:docs/openapi/latest.json > docs/openapi/previous.json || true
       - name: Generate current OpenAPI spec
         run: npm run api:spec
-      - name: Run openapi-diff
-        run: npx openapi-diff docs/openapi/previous.json docs/openapi/current.json > api-diff.txt || true
+      - name: Run openapi-diff (if previous exists)
+        run: |
+          if [ -s docs/openapi/previous.json ]; then
+            npx openapi-diff docs/openapi/previous.json docs/openapi/current.json > api-diff.txt || true
+          else
+            echo "No previous OpenAPI snapshot found on main — skipping diff and breaking-change check." > api-diff.txt
+          fi
       - name: Check for breaking changes
         shell: bash
         run: |
