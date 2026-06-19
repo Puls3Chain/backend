@@ -135,29 +135,34 @@ jobs:
         run: |
           git fetch origin main
           mkdir -p docs/openapi
-          git show origin/main:docs/openapi/latest.json > docs/openapi/previous.json || true
+          if git show origin/main:docs/openapi/latest.json > docs/openapi/previous.json 2>/dev/null; then
+            echo 'Fetched previous OpenAPI snapshot from main'
+          else
+            echo 'No previous OpenAPI snapshot found on main'
+            rm -f docs/openapi/previous.json
+          fi
       - name: Generate current OpenAPI spec
         run: npm run api:spec
-      - name: Run openapi-diff (if previous exists)
+      - name: Run openapi-diff
         run: |
-          if [ -s docs/openapi/previous.json ]; then
+          if [ -f docs/openapi/previous.json ]; then
             npx openapi-diff docs/openapi/previous.json docs/openapi/current.json > api-diff.txt || true
           else
-            echo "No previous OpenAPI snapshot found on main — skipping diff and breaking-change check." > api-diff.txt
+            echo 'SKIP: no previous OpenAPI snapshot available' > api-diff.txt
           fi
       - name: Check for breaking changes
         shell: bash
         run: |
           if grep -E 'Incompatible|Removed|ERROR|ERROR:' api-diff.txt; then
-            echo "Detected potentially breaking API changes." >&2
+            echo 'Detected potentially breaking API changes.' >&2
             PR_BODY="${{ github.event.pull_request.body }}"
             if echo "$PR_BODY" | grep -qiE 'api-breaking-change|BREAKING CHANGE'; then
-              echo "Breaking change acknowledged in PR body"
+              echo 'Breaking change acknowledged in PR body'
             else
-              echo "Breaking API changes detected but not documented in PR." >&2
+              echo 'Breaking API changes detected but not documented in PR.' >&2
               cat api-diff.txt >&2
               exit 1
             fi
           else
-            echo "No breaking API changes detected."
+            echo 'No breaking API changes detected.'
           fi
