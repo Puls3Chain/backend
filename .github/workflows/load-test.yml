@@ -1,0 +1,111 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'test/load/**'
+      - '.github/workflows/load-test.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    name: k6 Load Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellartip_load
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: stellartip_load
+      JWT_SECRET: load-test-secret
+      NODE_ENV: test
+      PORT: 3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start API server
+        run: node dist/main.js &
+        env:
+          PORT: 3000
+
+      - name: Wait for API to be ready
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/health && break
+            echo "Waiting for API... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run health smoke test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: test/load/health-smoke.js
+          flags: --out json=results/health-smoke.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Run auth rate-limit test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: test/load/auth-rate-limit.js
+          flags: --out json=results/auth-rate-limit.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Run tip creation burst test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: test/load/tip-creation.js
+          flags: --out json=results/tip-creation.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Run profile reads test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: test/load/profile-reads.js
+          flags: --out json=results/profile-reads.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Upload load test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-load-test-results
+          path: results/
+          retention-days: 30
