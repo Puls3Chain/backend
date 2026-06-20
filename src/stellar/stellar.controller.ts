@@ -7,11 +7,13 @@ import {
   HttpStatus,
   Post,
   Body,
+  Version,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { StellarService } from './stellar.service';
 
 @ApiTags('stellar')
+@Version('1')
 @Controller('stellar')
 export class StellarController {
   private readonly logger = new Logger(StellarController.name);

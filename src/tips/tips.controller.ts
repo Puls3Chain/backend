@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Version,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
@@ -17,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TipCreationThrottle } from '../config/throttle.config';
 
 @ApiTags('tips')
+@Version('1')
 @Controller('tips')
 export class TipsController {
   constructor(private readonly tipsService: TipsService) {}

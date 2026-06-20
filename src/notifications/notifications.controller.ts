@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Version,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Notification } from '../entities/notification.entity';
 
 @ApiTags('notifications')
+@Version('1')
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}

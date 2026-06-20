@@ -8,6 +8,7 @@ import {
   Req,
   HttpException,
   HttpStatus,
+  Version,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse } from '@nestjs/swagger';
@@ -20,6 +21,7 @@ import { User } from '../entities/user.entity';
 
 @ApiTags('auth')
 @Controller('auth')
+@Version('1')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
