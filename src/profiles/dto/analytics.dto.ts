@@ -14,6 +14,7 @@ export class AnalyticsQueryDto {
     description: 'Time period for analytics',
     enum: AnalyticsPeriod,
     default: AnalyticsPeriod.MONTH,
+    example: AnalyticsPeriod.MONTH,
   })
   @IsOptional()
   @IsEnum(AnalyticsPeriod)
@@ -21,6 +22,7 @@ export class AnalyticsQueryDto {
 
   @ApiPropertyOptional({
     description: 'Filter by asset type (XLM or USDC)',
+    example: 'XLM',
   })
   @IsOptional()
   @IsString()
