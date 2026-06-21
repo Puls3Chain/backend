@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -17,6 +17,13 @@ async function bootstrap(): Promise<void> {
 
     // Security headers and CORS
     configureSecurity(app);
+
+    // API Versioning with URI prefix (e.g., /v1/auth/login)
+    // defaultVersion: '1' provides backward compatibility for unversioned requests
+    app.enableVersioning({
+      type: VersioningType.URI,
+      defaultVersion: '1',
+    });
 
     // Response compression
     app.use(compression());
@@ -38,9 +45,14 @@ async function bootstrap(): Promise<void> {
       .setTitle('StellarTip API')
       .setDescription(
         'Decentralized micro-tipping platform on the Stellar blockchain. ' +
-          'Tip creators with XLM or USDC — no intermediaries, just Stellar.',
+          'Tip creators with XLM or USDC — no intermediaries, just Stellar.\n\n' +
+          '## API Versioning\n' +
+          'This API uses URI-based versioning. All endpoints are prefixed with `/v1`.\n' +
+          'Example: `GET /v1/auth/login`\n\n' +
+          '## Backward Compatibility\n' +
+          'For backward compatibility, requests without a version prefix will default to v1.',
       )
-      .setVersion('0.1.0')
+      .setVersion('1.0.0')
       .addBearerAuth()
       .addTag('auth', 'Authentication endpoints')
       .addTag('profiles', 'Creator profile management')
@@ -48,7 +60,7 @@ async function bootstrap(): Promise<void> {
       .addTag('stellar', 'Stellar blockchain interaction')
       .addTag('notifications', 'In-app notifications')
       .addTag('health', 'Health check and monitoring')
-      .addServer('http://localhost:3000', 'Local development')
+      .addServer('http://localhost:3000/v1', 'Local development (v1)')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

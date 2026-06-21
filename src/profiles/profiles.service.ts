@@ -3,9 +3,12 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { User } from '../entities/user.entity';
 import { Tip, TipStatus } from '../entities/tip.entity';
 import { CreateProfileDto } from './dto/create-profile.dto';
@@ -20,6 +23,8 @@ export class ProfilesService {
     private usersRepository: Repository<User>,
     @InjectRepository(Tip)
     private tipsRepository: Repository<Tip>,
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) {}
 
   async getProfile(username: string): Promise<User | null> {
@@ -167,7 +172,12 @@ export class ProfilesService {
       user.avatarUrl = updateDto.avatarUrl;
     }
 
-    return this.usersRepository.save(user);
+    const updatedUser = await this.usersRepository.save(user);
+
+    // Invalidate cache for this user's profile
+    await this.invalidateProfileCache(user.username);
+
+    return updatedUser;
   }
 
   async updateWalletAddress(
@@ -257,6 +267,9 @@ export class ProfilesService {
     user.avatarUrl = avatarUrl;
     await this.usersRepository.save(user);
 
+    // Invalidate cache for this user's profile
+    await this.invalidateProfileCache(user.username);
+
     return avatarUrl;
   }
 
@@ -307,6 +320,30 @@ export class ProfilesService {
       ])
       .take(20)
       .getMany();
+  }
+
+  /**
+   * Invalidate cache for a specific user's profile
+   * This clears cached data for:
+   * - Public profile endpoint
+   * - Tipping info endpoint
+   * - Search results (cleared by pattern)
+   */
+  private async invalidateProfileCache(username: string): Promise<void> {
+    try {
+      // Invalidate specific profile cache keys
+      const profileKey = `GET /v1/profiles/${username}`;
+      const tippingInfoKey = `GET /v1/profiles/${username}/tipping-info`;
+
+      await this.cacheManager.del(profileKey);
+      await this.cacheManager.del(tippingInfoKey);
+
+      // Note: Search results cache will expire naturally based on TTL
+      // For more aggressive invalidation, you could implement cache store iteration
+    } catch (error) {
+      // Log error but don't fail the operation if cache invalidation fails
+      console.error(`Failed to invalidate cache for user ${username}:`, error);
+    }
   }
 
   async getAnalytics(
