@@ -15,6 +15,7 @@ import {
   MaxFileSizeValidator,
   FileTypeValidator,
   Version,
+  CacheTTL,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -49,6 +50,8 @@ export class ProfilesController {
       },
     },
   })
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300) // 5 minutes
   @Get(':username/tipping-info')
   async getTippingInfo(
     @Param('username') username: string,
@@ -76,6 +79,8 @@ export class ProfilesController {
       },
     },
   })
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(600) // 10 minutes
   @Get(':username')
   async getProfile(@Param('username') username: string): Promise<User | null> {
     return this.profilesService.getProfile(username);
@@ -102,6 +107,8 @@ export class ProfilesController {
       ],
     },
   })
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300) // 5 minutes
   @Get()
   async searchProfiles(@Query('q') query: string): Promise<User[]> {
     if (!query) {
