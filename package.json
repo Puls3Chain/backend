@@ -18,7 +18,11 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:run": "npm run typeorm -- migration:run -d src/config/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/config/data-source.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/config/data-source.ts"
   },
   "lint-staged": {
     "*.ts": [
