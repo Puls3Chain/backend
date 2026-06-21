@@ -177,4 +177,14 @@ export class TipsController {
   ): Promise<Tip> {
     return this.tipsService.confirmTip(id, transactionHash);
   }
+
+  @ApiOperation({
+    summary: 'Verify a tip against Horizon and the Soroban contract',
+  })
+  @Post(':id/verify-onchain')
+  async verifyOnChain(
+    @Param('id') id: string,
+  ): Promise<import('./tips.service').OnChainTipVerificationResult> {
+    return this.tipsService.verifyTipOnChain(id);
+  }
 }

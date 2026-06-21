@@ -10,6 +10,7 @@ import { User } from './user.entity';
 
 export enum NotificationType {
   TIP_RECEIVED = 'tip_received',
+  DISCREPANCY_DETECTED = 'discrepancy_detected',
 }
 
 @Entity('notifications')
