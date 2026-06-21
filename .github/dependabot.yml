@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: deps
+    groups:
+      nestjs-ecosystem:
+        patterns:
+          - '@nestjs/*'
+          - 'nest-*'
+      stellar:
+        patterns:
+          - '@stellar/*'
+          - 'stellar-*'
+      dev-tools:
+        patterns:
+          - 'eslint*'
+          - '@eslint/*'
+          - 'prettier*'
+          - 'typescript*'
+          - '@typescript-eslint/*'
+          - 'husky'
+          - 'lint-staged'
+          - 'jest'
+          - '@types/*'
+          - 'ts-*'
+          - '@swc/*'
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies

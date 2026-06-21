@@ -1,0 +1,53 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge patch updates
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add changelog summary comment
+        if: steps.metadata.outputs.update-type != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const depName = '${{ steps.metadata.outputs.dependency-names }}';
+            const updateType = '${{ steps.metadata.outputs.update-type }}';
+            const prevVersion = '${{ steps.metadata.outputs.previous-version }}';
+            const newVersion = '${{ steps.metadata.outputs.new-version }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## Dependabot Update Summary\n\n| Field | Value |\n|---|---|\n| **Package** | \`${depName}\` |\n| **Update type** | \`${updateType}\` |\n| **Previous version** | \`${prevVersion}\` |\n| **New version** | \`${newVersion}\` |\n\nReview the [changelog](${pr.body ?? ''}) before merging minor or major bumps.`,
+            });
+
+      - name: Auto-merge patch-level updates
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
+          (steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' ||
+           steps.metadata.outputs.package-ecosystem == 'github_actions')
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -84,6 +84,32 @@ src/
 └── main.ts         # Application entrypoint
 ```
 
+## Dependency Management
+
+We use [Dependabot](https://docs.github.com/en/code-security/dependabot) to keep npm and GitHub Actions dependencies up to date automatically.
+
+### Schedule
+
+Dependabot opens PRs every **Monday at 09:00 UTC**. Related packages are batched into groups so you won't see a flood of individual PRs:
+
+| Group | Packages |
+|---|---|
+| `nestjs-ecosystem` | `@nestjs/*`, `nest-*` |
+| `stellar` | `@stellar/*`, `stellar-*` |
+| `dev-tools` | ESLint, Prettier, TypeScript, Jest, Husky, lint-staged, `@types/*`, ts-\* |
+
+A maximum of **10 open Dependabot PRs** are allowed at any time.
+
+### Review requirements
+
+| Semver bump | Action required |
+|---|---|
+| **patch** | Auto-merged by CI after all checks pass — no review needed |
+| **minor** | Requires one team member review; check the changelog summary comment left by the bot |
+| **major** | Requires two team member reviews; assess breaking changes and update code accordingly before merging |
+
+All Dependabot PRs use the `deps` conventional-commit prefix (e.g. `deps: bump @nestjs/common from 11.0.1 to 11.1.0`).
+
 ## License
 
 MIT
