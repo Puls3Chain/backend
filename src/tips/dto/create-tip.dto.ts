@@ -6,7 +6,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, TransformFnParams } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { sanitizeText } from '../../shared/sanitization/text-sanitizer';
 
@@ -28,11 +28,18 @@ export class CreateTipDto {
   @Min(0.0000001)
   amount: number;
 
-  @ApiPropertyOptional({ description: 'Optional message with the tip', maxLength: 280 })
+  @ApiPropertyOptional({
+    description: 'Optional message with the tip',
+    maxLength: 280,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(280)
-  @Transform(({ value }) => (value ? sanitizeText(value, 'message') : value))
+  @Transform(({ value }: TransformFnParams): unknown =>
+    typeof value === 'string'
+      ? sanitizeText(value, 'message')
+      : (value as unknown),
+  )
   message?: string;
 
   @ApiPropertyOptional({
