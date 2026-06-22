@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
@@ -27,9 +28,10 @@ describe('AppController (e2e)', () => {
 
   it('/ (GET)', async () => {
     if (!hasDb) return;
-    await request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('StellarTip API — Decentralized micro-tipping on Stellar');
+    const res = await request(app.getHttpServer()).get('/').expect(200);
+
+    expect(res.body.data).toBe(
+      'StellarTip API v0.1.0 — Decentralized micro-tipping on Stellar',
+    );
   });
 });

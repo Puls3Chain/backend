@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -26,7 +27,7 @@ export class TipsController {
   @TipCreationThrottle()
   async createTip(@Body() createTipDto: CreateTipDto): Promise<Tip> {
     if (!createTipDto.senderWallet && !createTipDto.transactionHash) {
-      throw new Error(
+      throw new BadRequestException(
         'senderWallet is required when no transactionHash is provided',
       );
     }

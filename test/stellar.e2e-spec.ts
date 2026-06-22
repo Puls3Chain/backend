@@ -68,7 +68,7 @@ describe('Stellar (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/stellar/verify-payment')
       .send({ transactionHash: 'invalid' })
-      .expect(200);
+      .expect(201);
     expect(res.body.data.verified).toBe(false);
   });
 });
