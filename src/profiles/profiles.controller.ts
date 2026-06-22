@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { ProfilesService } from './profiles.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
@@ -31,6 +31,22 @@ export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
   @ApiOperation({ summary: 'Get tipping info for a creator profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tipping info retrieved successfully',
+    schema: {
+      example: {
+        walletAddress: 'GABC123XYZ456DEF789GHI012JKL345MNO678PQR890STU123VWX456YZ',
+        displayName: 'John Doe',
+        bio: 'Content creator and developer',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        socialLinks: {
+          twitter: 'https://twitter.com/johndoe',
+          github: 'https://github.com/johndoe',
+        },
+      },
+    },
+  })
   @Get(':username/tipping-info')
   async getTippingInfo(
     @Param('username') username: string,
@@ -39,12 +55,51 @@ export class ProfilesController {
   }
 
   @ApiOperation({ summary: 'Get public profile by username' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile retrieved successfully',
+    schema: {
+      example: {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        username: 'johndoe',
+        email: 'user@example.com',
+        displayName: 'John Doe',
+        bio: 'Content creator and developer',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        socialLinks: {
+          twitter: 'https://twitter.com/johndoe',
+          github: 'https://github.com/johndoe',
+        },
+        createdAt: '2024-01-01T00:00:00Z',
+      },
+    },
+  })
   @Get(':username')
   async getProfile(@Param('username') username: string): Promise<User | null> {
     return this.profilesService.getProfile(username);
   }
 
   @ApiOperation({ summary: 'Search profiles by query' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profiles retrieved successfully',
+    schema: {
+      example: [
+        {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          username: 'johndoe',
+          displayName: 'John Doe',
+          avatarUrl: 'https://example.com/avatar.jpg',
+        },
+        {
+          id: '987f6543-e21b-43d3-a456-426614174000',
+          username: 'janedoe',
+          displayName: 'Jane Doe',
+          avatarUrl: 'https://example.com/avatar2.jpg',
+        },
+      ],
+    },
+  })
   @Get()
   async searchProfiles(@Query('q') query: string): Promise<User[]> {
     if (!query) {
@@ -54,6 +109,38 @@ export class ProfilesController {
   }
 
   @ApiOperation({ summary: 'Get creator analytics dashboard (cached 5 min)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics retrieved successfully',
+    schema: {
+      example: {
+        summary: {
+          totalTipsReceived: 150,
+          totalAmountReceived: 1250.5,
+          averageTipAmount: 8.33,
+          largestTipAmount: 100,
+        },
+        byAsset: [
+          { asset: 'XLM', totalAmount: 1000, tipCount: 120 },
+          { asset: 'USDC', totalAmount: 250.5, tipCount: 30 },
+        ],
+        timeSeries: [
+          { date: '2024-01-01', count: 10, totalAmount: 85, asset: 'XLM' },
+          { date: '2024-01-02', count: 15, totalAmount: 120, asset: 'XLM' },
+        ],
+        topSupporters: [
+          {
+            walletAddress: 'GDEF789GHI012JKL345MNO678PQR890STU123VWX456YZA123BCD456EFG',
+            totalAmount: 500,
+            tipCount: 50,
+            lastTipAt: '2024-01-15T00:00:00Z',
+          },
+        ],
+        period: '30d',
+        generatedAt: '2024-01-15T00:00:00Z',
+      },
+    },
+  })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(CacheInterceptor)
@@ -67,6 +154,26 @@ export class ProfilesController {
   }
 
   @ApiOperation({ summary: 'Update authenticated user profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+    schema: {
+      example: {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        username: 'johndoe',
+        email: 'user@example.com',
+        displayName: 'John Doe',
+        bio: 'Content creator and developer passionate about open source',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        socialLinks: {
+          twitter: 'https://twitter.com/johndoe',
+          github: 'https://github.com/johndoe',
+        },
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-15T00:00:00Z',
+      },
+    },
+  })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Put('me')
@@ -78,6 +185,23 @@ export class ProfilesController {
   }
 
   @ApiOperation({ summary: 'Update social links on profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Social links updated successfully',
+    schema: {
+      example: {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        username: 'johndoe',
+        socialLinks: {
+          twitter: 'https://twitter.com/johndoe',
+          github: 'https://github.com/johndoe',
+          youtube: 'https://youtube.com/@johndoe',
+          website: 'https://johndoe.com',
+        },
+        updatedAt: '2024-01-15T00:00:00Z',
+      },
+    },
+  })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Patch('me/social-links')
@@ -89,6 +213,15 @@ export class ProfilesController {
   }
 
   @ApiOperation({ summary: 'Upload profile avatar image' })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar uploaded successfully',
+    schema: {
+      example: {
+        avatarUrl: 'https://example.com/avatars/123e4567-e89b-12d3-a456-426614174000.jpg',
+      },
+    },
+  })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('me/avatar')
