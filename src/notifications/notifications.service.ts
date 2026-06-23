@@ -101,4 +101,17 @@ export class NotificationsService {
       { senderWallet, amount, asset },
     );
   }
+
+  async notifyDiscrepancyDetected(
+    creatorId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<Notification> {
+    return this.createNotification(
+      creatorId,
+      NotificationType.DISCREPANCY_DETECTED,
+      'On-chain discrepancy detected',
+      'A tip verification mismatch was detected between Horizon and the Soroban contract.',
+      metadata,
+    );
+  }
 }

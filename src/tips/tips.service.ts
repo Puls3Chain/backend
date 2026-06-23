@@ -2,6 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, LessThanOrEqual, Between } from 'typeorm';
@@ -9,6 +12,27 @@ import { ConfigService } from '@nestjs/config';
 import { Tip, TipStatus, TipAsset } from '../entities/tip.entity';
 import { User } from '../entities/user.entity';
 import { CreateTipDto } from './dto/create-tip.dto';
+import { createClient, RedisClientType } from 'redis';
+import {
+  StellarService,
+  ContractTipVerificationResult,
+} from '../stellar/stellar.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+export interface OnChainTipVerificationResult {
+  tipId: string;
+  tipIndex: number;
+  horizon: {
+    verified: boolean;
+    from?: string;
+    to?: string;
+    amount?: number;
+    asset?: string;
+    timestamp?: string;
+  };
+  contract: ContractTipVerificationResult;
+  matches: boolean;
+}
 
 export interface TipFilterOptions {
   page?: number;
@@ -26,8 +50,15 @@ const ALLOWED_SORT_BY = ['createdAt', 'amount'];
 const ALLOWED_SORT_ORDER = ['ASC', 'DESC'];
 
 @Injectable()
-export class TipsService {
+export class TipsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TipsService.name);
   private readonly usdcIssuer: string | null;
+  private readonly verificationCacheTtlMs = 60_000;
+  private redisClient: RedisClientType | null = null;
+  private readonly localVerificationCache = new Map<
+    string,
+    { expiresAt: number; payload: string }
+  >();
 
   constructor(
     @InjectRepository(Tip)
@@ -35,8 +66,99 @@ export class TipsService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private configService: ConfigService,
+    private stellarService: StellarService,
+    private notificationsService: NotificationsService,
   ) {
     this.usdcIssuer = this.configService.get<string>('USDC_ISSUER') || null;
+  }
+
+  async onModuleInit(): Promise<void> {
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+
+    if (!redisUrl) {
+      this.logger.warn(
+        'REDIS_URL is not configured; using in-memory verification cache',
+      );
+      return;
+    }
+
+    try {
+      this.redisClient = createClient({ url: redisUrl });
+      this.redisClient.on('error', (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Redis cache error: ${message}`);
+      });
+      await this.redisClient.connect();
+      this.logger.log(
+        'Redis cache initialized for on-chain verification results',
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Unable to connect to Redis cache: ${message}`);
+      this.redisClient = null;
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.redisClient?.isOpen) {
+      await this.redisClient.disconnect();
+    }
+  }
+
+  private getVerificationCacheKey(tipId: string): string {
+    return `tips:verify-onchain:${tipId}`;
+  }
+
+  private async readVerificationCache(
+    tipId: string,
+  ): Promise<OnChainTipVerificationResult | null> {
+    const cacheKey = this.getVerificationCacheKey(tipId);
+
+    if (this.redisClient?.isOpen) {
+      const cached = await this.redisClient.get(cacheKey);
+      return cached
+        ? (JSON.parse(cached) as OnChainTipVerificationResult)
+        : null;
+    }
+
+    const entry = this.localVerificationCache.get(cacheKey);
+    if (!entry) {
+      return null;
+    }
+
+    if (entry.expiresAt <= Date.now()) {
+      this.localVerificationCache.delete(cacheKey);
+      return null;
+    }
+
+    return JSON.parse(entry.payload) as OnChainTipVerificationResult;
+  }
+
+  private async writeVerificationCache(
+    tipId: string,
+    value: OnChainTipVerificationResult,
+  ): Promise<void> {
+    const cacheKey = this.getVerificationCacheKey(tipId);
+    const payload = JSON.stringify(value);
+
+    if (this.redisClient?.isOpen) {
+      await this.redisClient.setEx(cacheKey, 60, payload);
+      return;
+    }
+
+    this.localVerificationCache.set(cacheKey, {
+      expiresAt: Date.now() + this.verificationCacheTtlMs,
+      payload,
+    });
+  }
+
+  private async getCreatorTipIndex(tip: Tip): Promise<number> {
+    const creatorTips = await this.tipsRepository.find({
+      where: { creatorId: tip.creatorId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+
+    return creatorTips.findIndex((candidate) => candidate.id === tip.id);
   }
 
   private buildFilterQuery(filterOptions: TipFilterOptions): {
@@ -367,6 +489,79 @@ export class TipsService {
     tip.transactionHash = transactionHash;
     tip.status = TipStatus.COMPLETED;
     return this.tipsRepository.save(tip);
+  }
+
+  async verifyTipOnChain(id: string): Promise<OnChainTipVerificationResult> {
+    const cached = await this.readVerificationCache(id);
+    if (cached) {
+      return cached;
+    }
+
+    const tip = await this.tipsRepository.findOne({
+      where: { id },
+      relations: ['creator'],
+    });
+
+    if (!tip) {
+      throw new NotFoundException('Tip not found');
+    }
+
+    const tipIndex = await this.getCreatorTipIndex(tip);
+    if (tipIndex < 0) {
+      throw new NotFoundException('Tip not found in creator history');
+    }
+
+    const creatorAddress = tip.creator?.walletAddress || tip.receiverWallet;
+    const horizon = tip.transactionHash
+      ? await this.stellarService.verifyPayment(tip.transactionHash)
+      : { verified: false };
+    const contract = await this.stellarService.verifyTipOnContract(
+      creatorAddress,
+      tipIndex,
+    );
+
+    const timestampMatch =
+      !horizon.timestamp || !contract.timestamp
+        ? true
+        : new Date(horizon.timestamp).toISOString() ===
+          new Date(contract.timestamp).toISOString();
+
+    const matches =
+      Boolean(horizon.verified) &&
+      contract.exists &&
+      horizon.from === tip.senderWallet &&
+      horizon.to === tip.receiverWallet &&
+      Number(horizon.amount ?? 0) === Number(tip.amount) &&
+      timestampMatch &&
+      contract.from === tip.senderWallet &&
+      contract.to === tip.receiverWallet &&
+      Number(contract.amount) === Number(tip.amount);
+
+    const verification: OnChainTipVerificationResult = {
+      tipId: tip.id,
+      tipIndex,
+      horizon,
+      contract,
+      matches,
+    };
+
+    if (!matches) {
+      await this.notificationsService.notifyDiscrepancyDetected(tip.creatorId, {
+        tipId: tip.id,
+        tipIndex,
+        creatorAddress,
+        senderWallet: tip.senderWallet,
+        receiverWallet: tip.receiverWallet,
+        amount: tip.amount,
+        asset: tip.asset,
+        transactionHash: tip.transactionHash,
+        horizon,
+        contract,
+      });
+    }
+
+    await this.writeVerificationCache(id, verification);
+    return verification;
   }
 
   async getTipStats(creatorId: string): Promise<

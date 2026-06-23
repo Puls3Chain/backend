@@ -120,8 +120,9 @@ describe('Profiles (e2e)', () => {
         .get('/profiles/me/analytics')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
-      expect(res.body.data).toHaveProperty('totalTips');
-      expect(res.body.data).toHaveProperty('totalAmount');
+      expect(res.body.data).toHaveProperty('summary');
+      expect(res.body.data.summary).toHaveProperty('totalTipsReceived');
+      expect(res.body.data.summary).toHaveProperty('totalAmountReceived');
     });
 
     it('PATCH /profiles/me/social-links updates social links', async () => {
@@ -129,10 +130,10 @@ describe('Profiles (e2e)', () => {
       const res = await request(app.getHttpServer())
         .patch('/profiles/me/social-links')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ twitter: '@test', website: 'https://test.com' })
+        .send({ twitter: 'https://x.com/test', website: 'https://test.com' })
         .expect(200);
       expect(res.body.data.socialLinks).toMatchObject({
-        twitter: '@test',
+        twitter: 'https://x.com/test',
         website: 'https://test.com',
       });
     });

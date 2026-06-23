@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 1 1,4,7,10 *' # quarterly disaster-recovery-test
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -141,3 +144,51 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  disaster-recovery-test:
+    name: Disaster Recovery Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Run quarterly: first day of Jan, Apr, Jul, Oct — or on manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule')
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellartip_dr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: stellartip_dr
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      S3_PREFIX: backups
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Make scripts executable
+        run: chmod +x scripts/backup.sh scripts/restore.sh scripts/test-restore.sh
+      - name: Run backup
+        run: ./scripts/backup.sh
+      - name: Run test-restore
+        run: ./scripts/test-restore.sh

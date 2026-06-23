@@ -38,7 +38,7 @@ describe('Health (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/health/ready')
       .expect(200);
-    expect(res.body.statusCode).toBeDefined();
+    expect(res.body.status).toBe('ok');
   });
 
   it('GET /health/remote returns stellar status', async () => {
@@ -46,6 +46,6 @@ describe('Health (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/health/remote')
       .expect(200);
-    expect(res.body.statusCode).toBeDefined();
+    expect(res.body.status).toBe('ok');
   });
 });

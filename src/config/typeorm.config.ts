@@ -18,6 +18,8 @@ const config: TypeOrmModuleOptions = {
   migrationsRun: isProduction,
   synchronize: !isProduction,
   logging: !isProduction,
+  synchronize: process.env.NODE_ENV !== 'production',
+  logging: process.env.NODE_ENV !== 'production',
   logger: 'advanced-console',
   autoLoadEntities: true,
 };
