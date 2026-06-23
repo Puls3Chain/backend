@@ -49,6 +49,7 @@ allowlist so output is always plain text. This prevents stored XSS attacks where
 one user's input could execute in other users' browsers.
 
 Rules enforced on every text field:
+
 - All HTML tags and attributes stripped (`allowedTags: []`, `allowedAttributes: {}`)
 - Control characters removed (`\x00–\x08`, `\x0B`, `\x0C`, `\x0E–\x1F`, `\x7F`)
 - Tab (`\t`) and newline (`\n`) are preserved

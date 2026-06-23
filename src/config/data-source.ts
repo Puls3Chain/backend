@@ -12,6 +12,7 @@ export default new DataSource({
   database: process.env.DB_NAME || 'stellartip',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+  migrationsTableName: 'typeorm_migrations',
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
 });
