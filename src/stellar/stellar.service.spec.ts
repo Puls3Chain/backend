@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { StellarService } from './stellar.service';
 import { ConfigService } from '@nestjs/config';
+import { Tip } from '../entities/tip.entity';
+import { User } from '../entities/user.entity';
+import { TipsService } from '../tips/tips.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 jest.mock('@stellar/stellar-sdk', () => {
   const mockLoadAccount = jest.fn();
@@ -9,6 +14,12 @@ jest.mock('@stellar/stellar-sdk', () => {
   const mockGetBalance = jest.fn();
   const mockGetTip = jest.fn();
   const mockGetTipCount = jest.fn();
+
+  const mockContractClient = {
+    get_balance: mockGetBalance,
+    get_tip: mockGetTip,
+    get_tip_count: mockGetTipCount,
+  };
 
   return {
     Horizon: {
@@ -24,13 +35,9 @@ jest.mock('@stellar/stellar-sdk', () => {
     rpc: {
       Server: jest.fn().mockImplementation(() => ({})),
     },
-    contract: {
+    Contract: {
       Client: {
-        from: jest.fn().mockResolvedValue({
-          get_balance: mockGetBalance,
-          get_tip: mockGetTip,
-          get_tip_count: mockGetTipCount,
-        }),
+        from: jest.fn().mockResolvedValue(mockContractClient),
       },
     },
     Networks: {
@@ -42,11 +49,6 @@ jest.mock('@stellar/stellar-sdk', () => {
 
 describe('StellarService', () => {
   let service: StellarService;
-  let mockContractClient: {
-    get_balance: jest.Mock;
-    get_tip: jest.Mock;
-    get_tip_count: jest.Mock;
-  };
 
   const createMockAccount = (): Record<string, unknown> => ({
     balances: [
@@ -96,22 +98,36 @@ describe('StellarService', () => {
             }),
           },
         },
+        {
+          provide: getRepositoryToken(Tip),
+          useValue: {
+            findOne: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            findOne: jest.fn(),
+          },
+        },
+        {
+          provide: TipsService,
+          useValue: {
+            createTip: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            notifyTipReceived: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<StellarService>(StellarService);
     service.onModuleInit();
-
-    mockContractClient = {
-      get_balance: jest.fn(),
-      get_tip: jest.fn(),
-      get_tip_count: jest.fn(),
-    };
-
-    const stellarSdk = await import('@stellar/stellar-sdk');
-    (stellarSdk.contract.Client.from as jest.Mock).mockResolvedValue(
-      mockContractClient,
-    );
   });
 
   it('should be defined', () => {
@@ -201,17 +217,23 @@ describe('StellarService', () => {
 
   describe('verifyTipOnContract', () => {
     it('should verify a valid contract tip record', async () => {
-      mockContractClient.get_balance.mockResolvedValue({ result: 100 });
-      mockContractClient.get_tip_count.mockResolvedValue({ result: 1 });
-      mockContractClient.get_tip.mockResolvedValue({
-        result: {
-          exists: true,
-          from: 'GSOURCE...',
-          to: 'GRECEIVER...',
-          amount: 10,
-          timestamp: '2026-06-22T12:00:00.000Z',
-        },
-      });
+      const { Contract } = await import('@stellar/stellar-sdk');
+      const mockClient = {
+        get_balance: jest.fn().mockResolvedValue({ result: 100 }),
+        get_tip_count: jest.fn().mockResolvedValue({ result: 1 }),
+        get_tip: jest.fn().mockResolvedValue({
+          result: {
+            exists: true,
+            from: 'GSOURCE...',
+            to: 'GRECEIVER...',
+            amount: 10,
+            timestamp: '2026-06-22T12:00:00.000Z',
+          },
+        }),
+      };
+      ((Contract as any).Client.from as jest.Mock).mockResolvedValueOnce(
+        mockClient,
+      );
 
       const result = await service.verifyTipOnContract('GRECEIVER...', 0);
 
@@ -223,8 +245,8 @@ describe('StellarService', () => {
     });
 
     it('should return exists: false when the contract call fails', async () => {
-      const stellarSdk = await import('@stellar/stellar-sdk');
-      (stellarSdk.contract.Client.from as jest.Mock).mockRejectedValueOnce(
+      const { Contract } = await import('@stellar/stellar-sdk');
+      ((Contract as any).Client.from as jest.Mock).mockRejectedValueOnce(
         new Error('RPC unavailable'),
       );
 

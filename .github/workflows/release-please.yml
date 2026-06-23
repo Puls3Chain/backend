@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 concurrency:
   group: release-please
@@ -18,8 +19,12 @@ jobs:
     name: Create Release PR
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a PAT (with repo + pull-requests scopes) stored as RELEASE_PLEASE_TOKEN.
+          # If the secret is absent the expression resolves to an empty string, so we
+          # fall back explicitly to GITHUB_TOKEN via the env-level default below.
+          # To create a PAT: https://github.com/settings/tokens/new?scopes=repo
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

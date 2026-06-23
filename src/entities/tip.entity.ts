@@ -14,6 +14,13 @@ export enum TipStatus {
   FAILED = 'failed',
 }
 
+export enum TipWithdrawalStatus {
+  NONE = 'none',
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
 export enum TipAsset {
   XLM = 'XLM',
   USDC = 'USDC',
@@ -22,14 +29,14 @@ export enum TipAsset {
 @Entity('tips')
 export class Tip {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, (user) => user.receivedTips)
   @JoinColumn({ name: 'creator_id' })
-  creator: User;
+  creator!: User;
 
-  @Column({ name: 'creator_id' })
-  creatorId: string;
+  @Column('varchar', { name: 'creator_id' })
+  creatorId!: string;
 
   @ManyToOne(() => User, (user) => user.sentTips, { nullable: true })
   @JoinColumn({ name: 'supporter_id' })
@@ -38,38 +45,53 @@ export class Tip {
   @Column('uuid', { name: 'supporter_id', nullable: true })
   supporterId: string | null;
 
-  @Column({ name: 'sender_wallet' })
-  senderWallet: string;
+  @Column('varchar', { name: 'sender_wallet' })
+  senderWallet!: string;
 
-  @Column({ name: 'receiver_wallet' })
-  receiverWallet: string;
+  @Column('varchar', { name: 'receiver_wallet' })
+  receiverWallet!: string;
 
   @Column('decimal', { precision: 20, scale: 7 })
-  amount: number;
+  amount!: number;
 
   @Column({
-    type: 'enum',
-    enum: TipAsset,
+    type: 'varchar',
+    length: 10,
     default: TipAsset.XLM,
   })
-  asset: TipAsset;
+  asset!: TipAsset;
 
   @Column('varchar', { name: 'asset_issuer', nullable: true })
   assetIssuer: string | null;
 
-  @Column({ nullable: true })
-  message: string;
+  @Column('varchar', { nullable: true })
+  message!: string;
 
-  @Column({ unique: true, nullable: true })
-  transactionHash: string;
+  @Column('varchar', { unique: true, nullable: true })
+  transactionHash: string | null;
 
   @Column({
-    type: 'enum',
-    enum: TipStatus,
+    type: 'varchar',
+    length: 20,
     default: TipStatus.PENDING,
   })
-  status: TipStatus;
+  status!: TipStatus;
+
+  @Column({
+    name: 'withdrawal_status',
+    type: 'varchar',
+    length: 20,
+    default: TipWithdrawalStatus.NONE,
+  })
+  withdrawalStatus!: TipWithdrawalStatus;
+
+  @Column('varchar', {
+    name: 'withdrawal_transaction_hash',
+    unique: true,
+    nullable: true,
+  })
+  withdrawalTransactionHash: string | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

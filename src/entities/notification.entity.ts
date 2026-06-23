@@ -16,35 +16,35 @@ export enum NotificationType {
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user!: User;
 
   @Column({ name: 'user_id' })
-  userId: string;
+  userId!: string;
 
   @Column({
-    type: 'enum',
-    enum: NotificationType,
+    type: 'varchar',
+    length: 30,
     default: NotificationType.TIP_RECEIVED,
   })
-  type: NotificationType;
+  type!: NotificationType;
 
   @Column()
-  title: string;
+  title!: string;
 
   @Column('text')
-  message: string;
+  message!: string;
 
   @Column({ default: false })
-  isRead: boolean;
+  isRead!: boolean;
 
-  @Column('jsonb', { nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any> | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

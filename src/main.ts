@@ -13,6 +13,7 @@ async function bootstrap(): Promise<void> {
   try {
     const app = await NestFactory.create(AppModule, {
       logger: appLogger,
+      rawBody: true,
     });
 
     // Security headers and CORS
