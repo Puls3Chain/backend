@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const AppDataSource = new DataSource({
+export default new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
   port: +(process.env.DB_PORT || 5432),
@@ -13,6 +13,6 @@ const AppDataSource = new DataSource({
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   migrationsTableName: 'typeorm_migrations',
+  synchronize: false,
+  logging: process.env.NODE_ENV !== 'production',
 });
-
-export default AppDataSource;
