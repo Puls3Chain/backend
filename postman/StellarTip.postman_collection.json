@@ -93,7 +93,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{$randomUserName}}@stellartip.dev\",\n  \"password\": \"R@nd0m-Passw0rd-{{$randomInt}}\",\n  \"username\": \"{{$randomUserName}}\",\n  \"displayName\": \"Test Creator\"\n}"
+              "raw": "{\n  \"email\": \"alice@stellartip.dev\",\n  \"password\": \"correct-horse-battery-staple\",\n  \"username\": \"alice\",\n  \"displayName\": \"Alice the Creator\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/signup",
@@ -200,7 +200,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+              "raw": "{\n  \"email\": \"alice@stellartip.dev\",\n  \"password\": \"correct-horse-battery-staple\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
@@ -539,13 +539,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/profiles?q={{publicUsername}}",
+              "raw": "{{baseUrl}}/profiles?q=alice",
               "host": ["{{baseUrl}}"],
               "path": ["profiles"],
               "query": [
                 {
                   "key": "q",
-                  "value": "{{publicUsername}}",
+                  "value": "alice",
                   "description": "Search term; matches against username and displayName"
                 }
               ]
