@@ -6,6 +6,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import { StructuredLogger } from './shared/logging/logging.config';
+import {
+  initSentry,
+  registerSentryErrorHandler,
+  registerSentryHandlers,
+} from './sentry';
+
+initSentry();
 
 async function bootstrap(): Promise<void> {
   const appLogger = new StructuredLogger();
@@ -14,6 +21,8 @@ async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule, {
       logger: appLogger,
     });
+
+    registerSentryHandlers(app);
 
     // Security headers
     app.use(helmet());
@@ -64,6 +73,8 @@ async function bootstrap(): Promise<void> {
         persistAuthorization: true,
       },
     });
+
+    registerSentryErrorHandler(app);
 
     const port = process.env.PORT || 3000;
     await app.listen(port);
