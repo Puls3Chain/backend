@@ -3,6 +3,8 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const config: TypeOrmModuleOptions = {
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -11,8 +13,11 @@ const config: TypeOrmModuleOptions = {
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'stellartip',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: process.env.NODE_ENV !== 'production',
-  logging: process.env.NODE_ENV !== 'production',
+  migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+  migrationsTableName: 'typeorm_migrations',
+  migrationsRun: isProduction,
+  synchronize: !isProduction,
+  logging: !isProduction,
   logger: 'advanced-console',
   autoLoadEntities: true,
 };

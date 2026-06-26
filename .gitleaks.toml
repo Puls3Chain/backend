@@ -1,0 +1,20 @@
+title = "StellarTip secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "stellar-secret-key"
+description = "Stellar secret keys start with S and are 56 characters long."
+regex = '''S[A-Z2-7]{55}'''
+tags = ["stellar", "secret-key"]
+
+[allowlist]
+description = "Documented local-only placeholders and deterministic test fixtures."
+regexes = [
+  '''JWT_SECRET=(change-me-to-a-random-secret|test-secret-key|e2e-secret-key)''',
+  "secretOrKey:\\s*configService\\.get<string>\\('JWT_SECRET'\\)\\s*\\|\\|\\s*'your-secret-key'",
+  '''mockReturnValue\('test-access-token'\)''',
+  "password:\\s*'testpass123'",
+  '''DB_PASSWORD=postgres''',
+]

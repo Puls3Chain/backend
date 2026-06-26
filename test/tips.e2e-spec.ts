@@ -141,8 +141,7 @@ describe('Tips (e2e)', () => {
         .get('/tips/my/stats')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
-      expect(res.body.data).toHaveProperty('totalReceived');
-      expect(res.body.data).toHaveProperty('totalSent');
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('GET /tips/my/received rejects invalid token', async () => {

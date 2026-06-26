@@ -1,1 +1,8 @@
 npx lint-staged
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --config .gitleaks.toml
+else
+  echo "gitleaks not installed; skipping staged secret scan"
+  echo "Install gitleaks to run 'gitleaks protect --staged --redact' before commit."
+fi

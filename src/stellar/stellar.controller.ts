@@ -7,9 +7,14 @@ import {
   HttpStatus,
   Post,
   Body,
+  Headers,
+  Req,
+  HttpCode,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { StellarService } from './stellar.service';
+import { StellarContractEventPayload } from './contract/events';
 
 @ApiTags('stellar')
 @Controller('stellar')
@@ -68,5 +73,20 @@ export class StellarController {
       );
     }
     return this.stellarService.verifyPayment(transactionHash);
+  }
+
+  @ApiOperation({ summary: 'Ingest signed Soroban contract events' })
+  @Post('contract/webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleContractWebhook(
+    @Body() payload: StellarContractEventPayload,
+    @Headers('x-stellar-signature') signature: string | undefined,
+    @Req() request: Request,
+  ): Promise<{ accepted: true; duplicate: boolean }> {
+    return this.stellarService.handleContractWebhook(
+      payload,
+      request.rawBody,
+      signature,
+    );
   }
 }

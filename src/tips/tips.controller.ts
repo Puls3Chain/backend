@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -26,7 +27,7 @@ export class TipsController {
   @TipCreationThrottle()
   async createTip(@Body() createTipDto: CreateTipDto): Promise<Tip> {
     if (!createTipDto.senderWallet && !createTipDto.transactionHash) {
-      throw new Error(
+      throw new BadRequestException(
         'senderWallet is required when no transactionHash is provided',
       );
     }
@@ -176,5 +177,15 @@ export class TipsController {
     @Body('transactionHash') transactionHash: string,
   ): Promise<Tip> {
     return this.tipsService.confirmTip(id, transactionHash);
+  }
+
+  @ApiOperation({
+    summary: 'Verify a tip against Horizon and the Soroban contract',
+  })
+  @Post(':id/verify-onchain')
+  async verifyOnChain(
+    @Param('id') id: string,
+  ): Promise<import('./tips.service').OnChainTipVerificationResult> {
+    return this.tipsService.verifyTipOnChain(id);
   }
 }

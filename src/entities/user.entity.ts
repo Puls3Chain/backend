@@ -23,21 +23,21 @@ export enum UserRole {
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ unique: true })
-  username: string;
+  username!: string;
 
   @Column({ nullable: true })
-  displayName: string;
+  displayName!: string;
 
   @Column('text', { nullable: true })
-  bio: string;
+  bio!: string;
 
   @Column({ nullable: true })
-  avatarUrl: string;
+  avatarUrl!: string;
 
-  @Column('jsonb', { nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   socialLinks: {
     twitter?: string;
     github?: string;
@@ -46,42 +46,42 @@ export class User {
   } | null;
 
   @Column({ unique: true, nullable: true })
-  email: string;
+  email!: string;
 
   @Column({ nullable: true, select: false })
-  password: string;
+  password!: string;
 
   @Column({ unique: true, nullable: true })
-  walletAddress: string;
+  walletAddress!: string;
 
   @Column({
-    type: 'enum',
-    enum: AuthMethod,
+    type: 'varchar',
+    length: 20,
     default: AuthMethod.EMAIL,
   })
-  authMethod: AuthMethod;
+  authMethod!: AuthMethod;
 
   @Column({
-    type: 'enum',
-    enum: UserRole,
+    type: 'varchar',
+    length: 20,
     default: UserRole.USER,
   })
-  role: UserRole;
+  role!: UserRole;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @OneToMany(() => Tip, (tip) => tip.creator)
-  receivedTips: Tip[];
+  receivedTips!: Tip[];
 
   @OneToMany(() => Tip, (tip) => tip.supporter)
-  sentTips: Tip[];
+  sentTips!: Tip[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @BeforeInsert()
   @BeforeUpdate()
