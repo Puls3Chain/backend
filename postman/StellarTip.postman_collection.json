@@ -215,7 +215,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
                   "const body = pm.response.json();",
                   "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
                   "// Mirror /auth/signup: only capture tokens on a real success envelope so",
@@ -278,7 +279,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
                   "const body = pm.response.json();",
                   "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
                   "if (body.success && body.data && body.data.access_token) {",
@@ -358,7 +360,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
                   "const body = pm.response.json();",
                   "// Refresh can return 401 if the token has been rotated out from under us --",
                   "// only update the env vars on a real success envelope.",
