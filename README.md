@@ -15,6 +15,7 @@ This API powers creator profiles, tip transactions, and Stellar blockchain inter
 - **Runtime**: Node.js 20+
 - **Framework**: NestJS (TypeScript)
 - **Database**: PostgreSQL
+- **Rate limit store**: Redis in multi-instance deployments, in-memory fallback for local development
 - **ORM**: TypeORM
 - **Auth**: JWT + Stellar wallet (Freighter)
 - **Blockchain**: Stellar (via Horizon SDK)
@@ -72,6 +73,7 @@ This API powers creator profiles, tip transactions, and Stellar blockchain inter
 - Node.js 20+
 - npm
 - PostgreSQL (local or Docker)
+- Redis for shared rate limiting in multi-instance deployments (Docker Compose includes a local Redis service)
 
 ### Installation
 
@@ -99,21 +101,13 @@ open http://localhost:3000/api/docs
 docker compose up -d
 ```
 
-### Seed Data
+Docker Compose starts PostgreSQL, Redis, and the API. Set `REDIS_URL=redis://redis:6379` in `.env` when running the API container so NestJS stores throttler counters in Redis instead of process memory.
 
-Populate a development or demo database with deterministic realistic data:
+### Redis-backed rate limiting
 
-```bash
-npm run db:seed
-```
+The API uses NestJS throttling with a default limit of 100 requests per 60 seconds. When `REDIS_URL` is set, throttler keys are stored in Redis with the format `rl:<ip>:<method>:<endpoint>` so multiple API instances enforce the same global limits. The Redis key TTL is aligned to the throttler TTL, and temporary block keys use the throttler block duration.
 
-By default, the seed creates 50 creators, 500 tips across the last 90 days, and 200 notifications. Use `SEED_SCALE` to resize the dataset:
-
-```bash
-SEED_SCALE=0.5 npm run db:seed
-```
-
-The seed script truncates existing seeded tables before inserting data so repeated runs produce a consistent state. It refuses to run when `NODE_ENV=production`.
+If `REDIS_URL` is unset, rate limiting falls back to the built-in in-memory throttler storage for development convenience. If Redis is configured but unavailable at request time, the limiter fails open, logs a warning, and allows the request rather than blocking production traffic.
 
 ## Scripts
 
@@ -211,28 +205,26 @@ Query Parameters:
 
 ## Environment Variables
 
-| Variable                      | Description               | Default                               |
-| ----------------------------- | ------------------------- | ------------------------------------- |
-| `PORT`                        | Server port               | `3000`                                |
-| `CORS_ORIGIN`                 | Allowed CORS origin(s)    | `*`                                   |
-| `NODE_ENV`                    | Environment               | `development`                         |
-| `DB_HOST`                     | Database host             | `localhost`                           |
-| `DB_PORT`                     | Database port             | `5432`                                |
-| `DB_USERNAME`                 | Database username         | `postgres`                            |
-| `DB_PASSWORD`                 | Database password         | `postgres`                            |
-| `DB_NAME`                     | Database name             | `stellartip`                          |
-| `JWT_SECRET`                  | JWT signing secret        | —                                     |
-| `JWT_ACCESS_EXPIRATION`       | Access token TTL          | `15m`                                 |
-| `JWT_REFRESH_EXPIRATION_DAYS` | Refresh token TTL         | `30`                                  |
-| `STELLAR_NODE_URL`            | Stellar Horizon URL       | `https://horizon-testnet.stellar.org` |
-| `STELLAR_NETWORK`             | Stellar network           | `TESTNET`                             |
-| `USDC_ISSUER`                 | USDC asset issuer address | —                                     |
-| `THROTTLE_TTL`                | Rate limit window (ms)    | `60000`                               |
-| `THROTTLE_LIMIT`              | Rate limit max requests   | `100`                                 |
-
-## Status
-
-Check our public status page at [status.stellartip.com](https://status.stellartip.com) for real-time monitoring of API health, database connectivity, and Stellar Horizon availability. You can subscribe to incident updates via email or RSS.
+| Variable                      | Description                               | Default                               |
+| ----------------------------- | ----------------------------------------- | ------------------------------------- |
+| `PORT`                        | Server port                               | `3000`                                |
+| `CORS_ORIGIN`                 | Allowed CORS origin(s)                    | `*`                                   |
+| `NODE_ENV`                    | Environment                               | `development`                         |
+| `DB_HOST`                     | Database host                             | `localhost`                           |
+| `DB_PORT`                     | Database port                             | `5432`                                |
+| `DB_USERNAME`                 | Database username                         | `postgres`                            |
+| `DB_PASSWORD`                 | Database password                         | `postgres`                            |
+| `DB_NAME`                     | Database name                             | `stellartip`                          |
+| `JWT_SECRET`                  | JWT signing secret                        | —                                     |
+| `JWT_ACCESS_EXPIRATION`       | Access token TTL                          | `15m`                                 |
+| `JWT_REFRESH_EXPIRATION_DAYS` | Refresh token TTL                         | `30`                                  |
+| `STELLAR_NODE_URL`            | Stellar Horizon URL                       | `https://horizon-testnet.stellar.org` |
+| `STELLAR_NETWORK`             | Stellar network                           | `TESTNET`                             |
+| `USDC_ISSUER`                 | USDC asset issuer address                 | —                                     |
+| `REDIS_URL`                   | Redis URL for shared rate limiter storage | unset (in-memory throttler storage)   |
+| `REDIS_PORT`                  | Host port exposed by Docker Compose Redis | `6379`                                |
+| `THROTTLE_TTL`                | Rate limit window (ms)                    | `60000`                               |
+| `THROTTLE_LIMIT`              | Rate limit max requests                   | `100`                                 |
 
 ## API Documentation
 

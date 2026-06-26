@@ -75,7 +75,9 @@
     "sanitize-html": "^2.13.0",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.24",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.0",
+    "@sentry/integrations": "^7.120.3",
+    "@sentry/node": "^7.120.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
