@@ -1,0 +1,155 @@
+name: Security Audit
+
+# Primary security gate that runs on every push to main and every pull request.
+# Drift detection (weekly cron) lives in security-drift.yml so we keep schedule
+# separate from fast PR feedback.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm-audit:
+    name: npm audit (high+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run npm audit (fail on high/critical)
+        # --omit=dev so dev-only CVEs do not block runtime-heavy PRs.
+        # The weekly drift job audits devDeps separately.
+        run: |
+          set -euo pipefail
+          npm audit --json > npm-audit.json || true
+          npm audit --audit-level=high --omit=dev
+      - name: Upload audit JSON (always, for triage)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-json
+          path: npm-audit.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  codeql:
+    name: CodeQL (security-and-quality)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CodeQL needs full history for accurate data-flow analysis
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+          queries: security-and-quality
+          # NestJS is built before tests run, but CodeQL only needs the
+          # source tree — no build step required.
+          build-mode: none
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
+          upload: always
+
+  snyk-test:
+    name: Snyk test (high+)
+    # Optional: only runs when the repository has an SNYK_TOKEN secret.
+    # Removes the gate for projects that have not signed up for Snyk yet.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ secrets.SNYK_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@master
+      - name: Run Snyk vulnerability test
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --severity-threshold=high --sarif-file-output=snyk-node.sarif
+      - name: Run Snyk code (SAST) test
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        # Continue-on-error because the `snyk code test` step occasionally
+        # surfaces informational findings on transitive test fixtures, and
+        # we already gate on `npm audit` and `snyk test`.
+        continue-on-error: true
+        run: snyk code test --severity-threshold=high --sarif-file-output=snyk-code.sarif
+      - name: Upload Snyk SARIF to GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-node.sarif
+          category: snyk-node
+        continue-on-error: true
+      - name: Upload Snyk code SARIF to GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+        continue-on-error: true
+
+  snyk-monitor:
+    name: Snyk monitor (drift baseline)
+    # Re-snapshot the project on every push to main so the Snyk dashboard
+    # tracks drift over time. Never blocks merges.
+    needs: [npm-audit, codeql]
+    if: ${{ github.event_name == 'push' && secrets.SNYK_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@master
+      - name: Snapshot to Snyk
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          SNYK_ORG: ${{ vars.SNYK_ORG }}
+        # `snyk monitor` re-registers the manifest in the Snyk dashboard so
+        # drift over time is observable. Only forward `--org` when the repo
+        # has an explicit var configured; otherwise we fall back to the
+        # authenticated user's default org (SNYK_ORG may be empty).
+        run: |
+          if [ -n "${SNYK_ORG}" ]; then
+            snyk monitor --org="${SNYK_ORG}"
+          else
+            snyk monitor
+          fi

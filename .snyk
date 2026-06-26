@@ -1,0 +1,26 @@
+# Snyk policy file (https://docs.snyk.io/manage-issues/policies/the-.snyk-file)
+# Version: v1.0.0 schema.
+#
+# Goal: by default `snyk test` should treat every vulnerability as active and
+# let the `--severity-threshold=high` flag fail the gate. The empty `ignore`
+# and `patch` maps below make that default explicit so future maintainers can
+# audit this commitment.
+#
+# When a genuine false positive or dev-only path appears, append an ignore
+# block here with a `reason` AND an `expires` date (ISO 8601, ≤ 90 days out).
+# Example:
+#
+#   ignore:
+#     SNYK-JS-EXAMPLE-1234567:
+#       - '*':
+#           reason: 'Used only in the seed script CLI; not loaded at runtime.'
+#           expires: '2026-09-30T00:00:00.000Z'
+#           created: '2025-12-30T00:00:00.000Z'
+#
+# Suppressions expire to bound technical debt and are re-reviewed during the
+# weekly drift job (`.github/workflows/security-drift.yml`). See
+# `docs/SECURITY.md` for the full vulnerability management policy.
+
+version: v1.1.0
+ignore: {}
+patch: {}

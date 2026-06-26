@@ -1,0 +1,162 @@
+name: Security Drift
+
+# Weekly drift detection. Includes devDependencies (which mainline CI omits)
+# and runs unconditionally when scheduled. Opens a tracking issue when drift
+# is detected and closes it on the next clean run.
+
+on:
+  schedule:
+    # Monday 01:00 UTC — outside business hours in most timezones so
+    # notifications and potential rebuilds don't interrupt developers.
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  drift-detect:
+    name: Drift detection (weekly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Full audit (incl. devDeps)
+        id: npm-audit-full
+        run: |
+          set -euo pipefail
+          npm audit --json > drift-audit.json || true
+          if npm audit --audit-level=high; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload drift JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-audit-json
+          path: drift-audit.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  drift-issue:
+    name: Report drift issue
+    needs: drift-detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync drift issue (open while dirty, close when clean)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const clean = '${{ needs.drift-detect.outputs.clean }}' === 'true';
+            const title = 'Weekly security drift — high/critical vulns detected';
+            const mark = '<!-- security-drift-bot -->';
+            const labelName = 'security';
+            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+
+            // Make sure the label exists so issues.create doesn't 422 even on
+            // an upstream repo that hasn't created it yet.
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: labelName,
+                color: 'd73a4a',
+                description: 'Security-related issue or scan result',
+              });
+            } catch (err) {
+              if (err.status !== 422) throw err; // 422 = already exists; safe to ignore
+            }
+
+            const body = [
+              mark,
+              '## Weekly dependency drift',
+              '',
+              '`npm audit --audit-level=high` (full dependency tree, including devDeps)',
+              'detected at least one **high** or **critical** vulnerability since',
+              'the last clean run.',
+              '',
+              `- Workflow run: ${runUrl}`,
+              `- Triggered: ${{ github.event_name }}`,
+              '',
+              '### Triage',
+              '',
+              `1. Open the drift audit artifacts from the [workflow run](${runUrl}).`,
+              '2. Bump the affected package(s) **or** add an explicit, time-bounded',
+              '   `.snyk` suppression per `docs/SECURITY.md` (`reason` + `expires`).',
+              '3. Close this issue when the next weekly run passes.',
+            ].join('\n');
+
+            const pingBody =
+              `Still drifting as of run ${{ github.run_id }} — see [workflow run](${runUrl}). ` +
+              `Please prioritize triage.`;
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+            });
+            const matches = open.filter((i) => i.title === title || i.body?.includes(mark));
+
+            if (clean) {
+              // Close every open drift issue when the next run is clean.
+              for (const issue of matches) {
+                core.info(`Closing drift issue #${issue.number}`);
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `Closed by weekly drift job (run ${{ github.run_id }}). No high/critical vulnerabilities detected.`,
+                });
+              }
+              if (matches.length === 0) {
+                core.info('Audit clean and no drift issue open — nothing to do.');
+              }
+              return;
+            }
+
+            // Dirty: ping existing drift issues every week so they don't
+            // stagnate, and create exactly one if none exists.
+            for (const issue of matches) {
+              core.info(`Pinging drift issue #${issue.number} (still dirty)`);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: pingBody,
+              });
+            }
+            if (matches.length === 0) {
+              core.info('Drift detected — opening tracking issue.');
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [labelName],
+              });
+            }

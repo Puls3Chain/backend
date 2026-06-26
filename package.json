@@ -23,6 +23,13 @@
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/config/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/config/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/config/data-source.ts",
+    "audit:ci": "npm audit --audit-level=high --omit=dev",
+    "audit:full": "npm audit --audit-level=high",
+    "audit:fix": "npm audit fix",
+    "test:postman": "bash scripts/run-postman.sh dev",
+    "test:postman:dev": "bash scripts/run-postman.sh dev",
+    "test:postman:staging": "bash scripts/run-postman.sh staging",
+    "test:postman:prod": "bash scripts/run-postman.sh prod",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -95,6 +102,7 @@
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "lint-staged": "^17.0.7",
+    "newman": "^6.2.1",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "sqlite3": "^5.1.7",
