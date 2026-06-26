@@ -3,6 +3,8 @@
 The NestJS backend for [StellarTip](https://stellartip.com) — a decentralized micro-tipping platform for creators on the Stellar ecosystem.
 
 [![CI](https://github.com/StellarTips/StellarTip-Backend/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarTips/StellarTip-Backend/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/StellarTips/StellarTip-Backend)](https://github.com/StellarTips/StellarTip-Backend/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/StellarTips/StellarTip-Backend/total)](https://github.com/StellarTips/StellarTip-Backend/releases)
 
 ## Overview
 
@@ -22,11 +24,13 @@ This API powers creator profiles, tip transactions, and Stellar blockchain inter
 ## Features
 
 ### Auth
+
 - Stellar wallet (Freighter) authentication with signature verification
 - Email/password authentication with JWT + refresh token rotation
 - Wallet nonce signing verification
 
 ### Profiles
+
 - Creator profiles with username, display name, bio, and avatar
 - Avatar upload with validation (JPEG, PNG, WEBP, max 5MB)
 - Social links (Twitter/X, GitHub, YouTube, Website)
@@ -35,22 +39,26 @@ This API powers creator profiles, tip transactions, and Stellar blockchain inter
 - Profile search
 
 ### Tips
+
 - Instant tip recording (XLM/USDC)
 - Tip history with filtering, sorting, and pagination
 - Transaction verification via Stellar Horizon
 - Tip statistics and analytics
 
 ### Notifications
+
 - In-app notifications for tip receipts
 - Unread count badge support
 - Mark as read functionality
 
 ### Stellar
+
 - Balance checking (XLM + USDC)
 - Transaction verification via Horizon
 - Account info lookup
 
 ### DevOps
+
 - Docker & Docker Compose for local development
 - Health check endpoints (liveness, readiness, remote)
 - Rate limiting with configurable thresholds
@@ -91,68 +99,91 @@ open http://localhost:3000/api/docs
 docker compose up -d
 ```
 
+### Seed Data
+
+Populate a development or demo database with deterministic realistic data:
+
+```bash
+npm run db:seed
+```
+
+By default, the seed creates 50 creators, 500 tips across the last 90 days, and 200 notifications. Use `SEED_SCALE` to resize the dataset:
+
+```bash
+SEED_SCALE=0.5 npm run db:seed
+```
+
+The seed script truncates existing seeded tables before inserting data so repeated runs produce a consistent state. It refuses to run when `NODE_ENV=production`.
+
 ## Scripts
 
-| Command            | Description                        |
-|--------------------|------------------------------------|
-| `npm run start:dev`| Start development server (watch)   |
-| `npm run build`    | Build for production               |
-| `npm run start`    | Start production server            |
-| `npm test`         | Run unit tests                     |
-| `npm run test:e2e` | Run end-to-end tests               |
-| `npm run lint`     | Lint and auto-fix code             |
+| Command             | Description                      |
+| ------------------- | -------------------------------- |
+| `npm run start:dev` | Start development server (watch) |
+| `npm run build`     | Build for production             |
+| `npm run start`     | Start production server          |
+| `npm test`          | Run unit tests                   |
+| `npm run test:e2e`  | Run end-to-end tests             |
+| `npm run lint`      | Lint and auto-fix code           |
+| `npm run db:seed`   | Seed development/demo data       |
 
 ## API Endpoints
 
 ### Auth
-| Method | Path                    | Auth     | Description                     |
-|--------|-------------------------|----------|---------------------------------|
-| POST   | `/auth/signup`          | Public   | Register with email/password    |
-| POST   | `/auth/login`           | Public   | Login with email/password       |
-| POST   | `/auth/stellar/login`   | Public   | Login with Stellar wallet       |
-| POST   | `/auth/refresh`         | Public   | Refresh access token            |
-| GET    | `/auth/nonce`           | Public   | Get signing nonce for wallet    |
-| GET    | `/auth/profile`         | Bearer   | Get current user profile        |
+
+| Method | Path                  | Auth   | Description                  |
+| ------ | --------------------- | ------ | ---------------------------- |
+| POST   | `/auth/signup`        | Public | Register with email/password |
+| POST   | `/auth/login`         | Public | Login with email/password    |
+| POST   | `/auth/stellar/login` | Public | Login with Stellar wallet    |
+| POST   | `/auth/refresh`       | Public | Refresh access token         |
+| GET    | `/auth/nonce`         | Public | Get signing nonce for wallet |
+| GET    | `/auth/profile`       | Bearer | Get current user profile     |
 
 ### Profiles
-| Method | Path                           | Auth     | Description                      |
-|--------|--------------------------------|----------|----------------------------------|
-| GET    | `/profiles/:username`          | Public   | Get creator public profile       |
-| GET    | `/profiles/:username/tipping-info` | Public | Get creator tipping page data   |
-| GET    | `/profiles?q=query`            | Public   | Search creators                  |
-| PUT    | `/profiles/me`                 | Bearer   | Update own profile               |
-| PATCH  | `/profiles/me/social-links`    | Bearer   | Update social links              |
-| POST   | `/profiles/me/avatar`          | Bearer   | Upload avatar (multipart)        |
-| GET    | `/profiles/me/analytics`       | Bearer   | Creator analytics dashboard      |
+
+| Method | Path                               | Auth   | Description                   |
+| ------ | ---------------------------------- | ------ | ----------------------------- |
+| GET    | `/profiles/:username`              | Public | Get creator public profile    |
+| GET    | `/profiles/:username/tipping-info` | Public | Get creator tipping page data |
+| GET    | `/profiles?q=query`                | Public | Search creators               |
+| PUT    | `/profiles/me`                     | Bearer | Update own profile            |
+| PATCH  | `/profiles/me/social-links`        | Bearer | Update social links           |
+| POST   | `/profiles/me/avatar`              | Bearer | Upload avatar (multipart)     |
+| GET    | `/profiles/me/analytics`           | Bearer | Creator analytics dashboard   |
 
 ### Tips
-| Method | Path                      | Auth   | Description                    |
-|--------|---------------------------|--------|--------------------------------|
-| POST   | `/tips`                   | Public | Create a new tip               |
-| GET    | `/tips/:id`               | Public | Get tip details                |
-| GET    | `/tips/my/received`       | Bearer | My received tips (paginated)   |
-| GET    | `/tips/my/sent`           | Bearer | My sent tips (paginated)       |
-| GET    | `/tips/my/stats`          | Bearer | My tip statistics              |
-| GET    | `/tips/wallet/:address`   | Public | Tips by wallet address         |
-| POST   | `/tips/:id/confirm`       | Bearer | Confirm a tip with tx hash     |
+
+| Method | Path                    | Auth   | Description                  |
+| ------ | ----------------------- | ------ | ---------------------------- |
+| POST   | `/tips`                 | Public | Create a new tip             |
+| GET    | `/tips/:id`             | Public | Get tip details              |
+| GET    | `/tips/my/received`     | Bearer | My received tips (paginated) |
+| GET    | `/tips/my/sent`         | Bearer | My sent tips (paginated)     |
+| GET    | `/tips/my/stats`        | Bearer | My tip statistics            |
+| GET    | `/tips/wallet/:address` | Public | Tips by wallet address       |
+| POST   | `/tips/:id/confirm`     | Bearer | Confirm a tip with tx hash   |
 
 ### Notifications
-| Method | Path                         | Auth   | Description                 |
-|--------|------------------------------|--------|-----------------------------|
-| GET    | `/notifications`             | Bearer | Get notifications (paginated)|
-| GET    | `/notifications/unread-count`| Bearer | Get unread count            |
-| PATCH  | `/notifications/:id/read`    | Bearer | Mark notification as read   |
+
+| Method | Path                          | Auth   | Description                   |
+| ------ | ----------------------------- | ------ | ----------------------------- |
+| GET    | `/notifications`              | Bearer | Get notifications (paginated) |
+| GET    | `/notifications/unread-count` | Bearer | Get unread count              |
+| PATCH  | `/notifications/:id/read`     | Bearer | Mark notification as read     |
 
 ### Stellar
-| Method | Path                        | Auth   | Description              |
-|--------|-----------------------------|--------|--------------------------|
-| GET    | `/stellar/balance`          | Public | Get wallet balance       |
-| GET    | `/stellar/account`          | Public | Get account info         |
-| POST   | `/stellar/verify-payment`   | Public | Verify a transaction     |
+
+| Method | Path                      | Auth   | Description          |
+| ------ | ------------------------- | ------ | -------------------- |
+| GET    | `/stellar/balance`        | Public | Get wallet balance   |
+| GET    | `/stellar/account`        | Public | Get account info     |
+| POST   | `/stellar/verify-payment` | Public | Verify a transaction |
 
 ### Health
+
 | Method | Path             | Auth   | Description              |
-|--------|------------------|--------|--------------------------|
+| ------ | ---------------- | ------ | ------------------------ |
 | GET    | `/health`        | Public | Liveness check           |
 | GET    | `/health/ready`  | Public | Readiness (DB check)     |
 | GET    | `/health/remote` | Public | Remote (Stellar Horizon) |
@@ -167,31 +198,35 @@ docker compose up -d
 - **topSupporters**: top 5 supporters by total amount
 
 Query Parameters:
-| Param   | Type   | Default | Description                              |
+| Param | Type | Default | Description |
 |---------|--------|---------|------------------------------------------|
-| `period`| string | `30d`   | Time period: `7d`, `30d`, `90d`, `365d`, `all` |
-| `asset` | string | —       | Filter by asset: `XLM` or `USDC`         |
+| `period`| string | `30d` | Time period: `7d`, `30d`, `90d`, `365d`, `all` |
+| `asset` | string | — | Filter by asset: `XLM` or `USDC` |
 
 ## Environment Variables
 
-| Variable                      | Description                  | Default                                      |
-|-------------------------------|------------------------------|----------------------------------------------|
-| `PORT`                        | Server port                  | `3000`                                       |
-| `CORS_ORIGIN`                 | Allowed CORS origin(s)       | `*`                                          |
-| `NODE_ENV`                    | Environment                  | `development`                                |
-| `DB_HOST`                     | Database host                | `localhost`                                  |
-| `DB_PORT`                     | Database port                | `5432`                                       |
-| `DB_USERNAME`                 | Database username            | `postgres`                                   |
-| `DB_PASSWORD`                 | Database password            | `postgres`                                   |
-| `DB_NAME`                     | Database name                | `stellartip`                                 |
-| `JWT_SECRET`                  | JWT signing secret           | —                                            |
-| `JWT_ACCESS_EXPIRATION`       | Access token TTL             | `15m`                                        |
-| `JWT_REFRESH_EXPIRATION_DAYS` | Refresh token TTL            | `30`                                         |
-| `STELLAR_NODE_URL`            | Stellar Horizon URL          | `https://horizon-testnet.stellar.org`        |
-| `STELLAR_NETWORK`             | Stellar network              | `TESTNET`                                    |
-| `USDC_ISSUER`                 | USDC asset issuer address    | —                                            |
-| `THROTTLE_TTL`                | Rate limit window (ms)       | `60000`                                      |
-| `THROTTLE_LIMIT`              | Rate limit max requests      | `100`                                        |
+| Variable                      | Description               | Default                               |
+| ----------------------------- | ------------------------- | ------------------------------------- |
+| `PORT`                        | Server port               | `3000`                                |
+| `CORS_ORIGIN`                 | Allowed CORS origin(s)    | `*`                                   |
+| `NODE_ENV`                    | Environment               | `development`                         |
+| `DB_HOST`                     | Database host             | `localhost`                           |
+| `DB_PORT`                     | Database port             | `5432`                                |
+| `DB_USERNAME`                 | Database username         | `postgres`                            |
+| `DB_PASSWORD`                 | Database password         | `postgres`                            |
+| `DB_NAME`                     | Database name             | `stellartip`                          |
+| `JWT_SECRET`                  | JWT signing secret        | —                                     |
+| `JWT_ACCESS_EXPIRATION`       | Access token TTL          | `15m`                                 |
+| `JWT_REFRESH_EXPIRATION_DAYS` | Refresh token TTL         | `30`                                  |
+| `STELLAR_NODE_URL`            | Stellar Horizon URL       | `https://horizon-testnet.stellar.org` |
+| `STELLAR_NETWORK`             | Stellar network           | `TESTNET`                             |
+| `USDC_ISSUER`                 | USDC asset issuer address | —                                     |
+| `THROTTLE_TTL`                | Rate limit window (ms)    | `60000`                               |
+| `THROTTLE_LIMIT`              | Rate limit max requests   | `100`                                 |
+
+## Status
+
+Check our public status page at [status.stellartip.com](https://status.stellartip.com) for real-time monitoring of API health, database connectivity, and Stellar Horizon availability. You can subscribe to incident updates via email or RSS.
 
 ## API Documentation
 

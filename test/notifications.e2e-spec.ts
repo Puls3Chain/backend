@@ -79,7 +79,7 @@ describe('Notifications (e2e)', () => {
         .get('/notifications/unread-count')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
-      expect(typeof res.body.data.count).toBe('number');
+      expect(typeof res.body.data.unreadCount).toBe('number');
     });
 
     it('PATCH /notifications/:id/read returns 404 for nonexistent', async () => {
