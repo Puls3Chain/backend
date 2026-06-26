@@ -35,8 +35,12 @@
                   "pm.test('Status code is 2xx', () => {",
                   "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
                   "});",
-                  "const data = pm.response.json();",
-                  "pm.test('Response has message field', () => pm.expect(data).to.have.property('message'));"
+                  "// use `body`, not `data` -- `data` is reserved by Postman Sandbox (iteration data); `const data` raises SyntaxError under Newman 6.x",
+                  "const body = pm.response.json();",
+                  "pm.test('Response has data field', () => {",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});"
                 ]
               }
             }
@@ -106,14 +110,19 @@
                 "exec": [
                   "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
                   "const body = pm.response.json();",
-                  "pm.test('Returns access_token', () => pm.expect(body).to.have.property('access_token').that.is.a('string'));",
-                  "pm.test('Returns refresh_token', () => pm.expect(body).to.have.property('refresh_token').that.is.a('string'));",
-                  "if (body.access_token) {",
-                  "  pm.environment.set('accessToken', body.access_token);",
-                  "  pm.environment.set('refreshToken', body.refresh_token);",
+                  "// The shared ResponseInterceptor wraps every success body in",
+                  "// { success, statusCode, data, requestId, timestamp }, so the",
+                  "// JWT pair lives under `body.data`, not at the top level.",
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "pm.test('Returns refresh_token', () => pm.expect(body.data).to.have.property('refresh_token').that.is.a('string'));",
+                  "// Guard with `body.success` so the chained folder requests still run",
+                  "// when signup fails (e.g. 409 Conflict on a retry run).",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
                   "}",
-                  "if (body.user && body.user.id) {",
-                  "  pm.environment.set('userId', body.user.id);",
+                  "if (body.success && body.data && body.data.user && body.data.user.id) {",
+                  "  pm.environment.set('userId', body.data.user.id);",
                   "}"
                 ]
               }
@@ -149,7 +158,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"access_token\": \"eyJhbGciOi...\",\n  \"refresh_token\": \"rt_abc123...\",\n  \"expires_in\": 900,\n  \"user\": {\n    \"id\": \"7c1c0000-1111-2222-3333-444455556666\",\n    \"email\": \"alice@stellartip.dev\",\n    \"username\": \"alice\",\n    \"displayName\": \"Alice\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_abc123...\",\n    \"expires_in\": 900,\n    \"user\": {\n      \"id\": \"7c1c0000-1111-2222-3333-444455556666\",\n      \"email\": \"alice@stellartip.dev\",\n      \"username\": \"alice\",\n      \"displayName\": \"Alice\",\n      \"role\": \"user\"\n    }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
             },
             {
               "name": "409 Conflict (email taken)",
@@ -208,9 +217,13 @@
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.test('Returns access_token', () => pm.expect(body.access_token).to.exist);",
-                  "pm.environment.set('accessToken', body.access_token);",
-                  "pm.environment.set('refreshToken', body.refresh_token);"
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "// Mirror /auth/signup: only capture tokens on a real success envelope so",
+                  "// 401 / 400 / 503 responses don't wipe the env for the next request.",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
                 ]
               }
             }
@@ -227,7 +240,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"access_token\": \"eyJhbGciOi...\",\n  \"refresh_token\": \"rt_xyz789...\",\n  \"expires_in\": 900,\n  \"user\": { \"id\": \"7c1c0000-1111-2222-3333-444455556666\" }\n}"
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_xyz789...\",\n    \"expires_in\": 900,\n    \"user\": { \"id\": \"7c1c0000-1111-2222-3333-444455556666\" }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
             },
             {
               "name": "401 Invalid credentials",
@@ -267,14 +280,48 @@
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.test('Returns access_token', () => pm.expect(body.access_token).to.exist);",
-                  "pm.environment.set('accessToken', body.access_token);",
-                  "pm.environment.set('refreshToken', body.refresh_token);"
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
                 ]
               }
             }
           ],
           "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"walletAddress\": \"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/stellar/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "stellar", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_stellar01...\",\n    \"expires_in\": 900,\n    \"user\": { \"id\": \"7c1c2222-3333-4444-5555-666677778888\" }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
+            },
             {
               "name": "400 Invalid Stellar address",
               "status": "Bad Request",
@@ -313,8 +360,12 @@
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.environment.set('accessToken', body.access_token);",
-                  "pm.environment.set('refreshToken', body.refresh_token);"
+                  "// Refresh can return 401 if the token has been rotated out from under us --",
+                  "// only update the env vars on a real success envelope.",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
                 ]
               }
             }
@@ -354,8 +405,8 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('Returns nonce and message', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('nonce').that.is.a('string');",
-                  "  pm.expect(body).to.have.property('message').that.is.a('string');",
+                  "  pm.expect(body.data).to.have.property('nonce').that.is.a('string');",
+                  "  pm.expect(body.data).to.have.property('message').that.is.a('string');",
                   "});"
                 ]
               }
@@ -399,8 +450,8 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('Returns user object', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('id');",
-                  "  pm.expect(body).to.have.property('email');",
+                  "  pm.expect(body.data).to.have.property('id');",
+                  "  pm.expect(body.data).to.have.property('email');",
                   "});"
                 ]
               }
@@ -441,8 +492,8 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('Returns a User-shaped object', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('username');",
-                  "  pm.expect(body).to.have.property('displayName');",
+                  "  pm.expect(body.data).to.have.property('username');",
+                  "  pm.expect(body.data).to.have.property('displayName');",
                   "});"
                 ]
               }
@@ -475,7 +526,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Body is JSON object', () => pm.expect(pm.response.json()).to.be.an('object'));"
+                  "pm.test('Body is JSON object', () => pm.expect(pm.response.json().data).to.be.an('object'));"
                 ]
               }
             }
@@ -508,7 +559,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                  "pm.test('Returns an array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
                 ]
               }
             }
@@ -545,7 +596,7 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('displayName persisted', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body.displayName).to.eql('Alice the Creator');",
+                  "  pm.expect(body.data.displayName).to.eql('Alice the Creator');",
                   "});"
                 ]
               }
@@ -622,7 +673,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
-                  "pm.test('Returns avatarUrl', () => pm.expect(pm.response.json()).to.have.property('avatarUrl'));"
+                  "pm.test('Returns avatarUrl', () => pm.expect(pm.response.json().data).to.have.property('avatarUrl'));"
                 ]
               }
             }
@@ -661,11 +712,19 @@
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.test('Has summary block', () => pm.expect(body).to.have.property('summary'));",
-                  "pm.test('summary.totalTips is numeric', () => pm.expect(body.summary).to.have.property('totalTips'));",
-                  "pm.test('Has byAsset block', () => pm.expect(body).to.have.property('byAsset'));",
-                  "pm.test('Has timeSeries block', () => pm.expect(body).to.have.property('timeSeries'));",
-                  "pm.test('Has topSupporters block', () => pm.expect(body).to.have.property('topSupporters'));"
+                  "// The analytics payload { summary, byAsset, timeSeries, topSupporters }",
+                  "// is wrapped by ResponseInterceptor -> the object lives under `body.data`.",
+                  "// The summary block carries `totalTipsReceived`, not `totalTips` --",
+                  "// the analytics service emits the former to keep the metric unambiguous.",
+                  "pm.test('Has summary block', () => {",
+                  "  pm.expect(body.data).to.have.property('summary').that.is.an('object');",
+                  "});",
+                  "pm.test('summary.totalTipsReceived is numeric', () => {",
+                  "  pm.expect(body.data.summary).to.have.property('totalTipsReceived').that.is.a('number');",
+                  "});",
+                  "pm.test('Has byAsset array', () => pm.expect(body.data.byAsset).to.be.an('array'));",
+                  "pm.test('Has timeSeries array', () => pm.expect(body.data.timeSeries).to.be.an('array'));",
+                  "pm.test('Has topSupporters array', () => pm.expect(body.data.topSupporters).to.be.an('array'));"
                 ]
               }
             }
@@ -707,8 +766,8 @@
                 "exec": [
                   "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
                   "const body = pm.response.json();",
-                  "pm.test('Returns tip id', () => pm.expect(body.id).to.exist);",
-                  "pm.environment.set('tipId', body.id);"
+                  "pm.test('Returns tip id', () => pm.expect(body.data.id).to.exist);",
+                  "pm.environment.set('tipId', body.data.id);"
                 ]
               }
             }
@@ -781,10 +840,13 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('Has paginated shape', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('data').that.is.an('array');",
-                  "  pm.expect(body).to.have.property('total');",
-                  "  pm.expect(body).to.have.property('page');",
-                  "  pm.expect(body).to.have.property('limit');",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
                   "});"
                 ]
               }
@@ -821,7 +883,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Has paginated shape', () => pm.expect(pm.response.json()).to.have.property('data'));"
+                  "pm.test('Has paginated shape', () => {",
+                  "  const body = pm.response.json();",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
+                  "});"
                 ]
               }
             }
@@ -861,7 +932,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Has paginated shape', () => pm.expect(pm.response.json()).to.have.property('data'));"
+                  "pm.test('Has paginated shape', () => {",
+                  "  const body = pm.response.json();",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
+                  "});"
                 ]
               }
             }
@@ -889,8 +969,10 @@
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('Returns array of asset groups', () => {",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body).to.be.an('array');",
-                  "  if (body.length) pm.expect(body[0]).to.have.property('asset');",
+                  "// stats is an array at the service layer -> wrapped by ResponseInterceptor",
+                  "// -> the array is reachable through `body.data`.",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  if (body.data.length) pm.expect(body.data[0]).to.have.property('asset');",
                   "});"
                 ]
               }
@@ -961,7 +1043,7 @@
                   "  pm.expect([200, 400, 404]).to.include(pm.response.code);",
                   "});",
                   "if (pm.response.code === 200) {",
-                  "  pm.test('Returns verified boolean', () => pm.expect(pm.response.json()).to.have.property('verified'));",
+                  "  pm.test('Returns verified boolean', () => pm.expect(pm.response.json().data).to.have.property('verified'));",
                   "}"
                 ]
               }
@@ -1004,7 +1086,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Has paginated shape', () => pm.expect(pm.response.json()).to.have.property('data'));"
+                  "pm.test('Has paginated shape', () => pm.expect(pm.response.json().data).to.have.property('data'));"
                 ]
               }
             }
@@ -1030,7 +1112,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Returns unreadCount', () => pm.expect(pm.response.json()).to.have.property('unreadCount').that.is.a('number'));"
+                  "pm.test('Returns unreadCount', () => pm.expect(pm.response.json().data).to.have.property('unreadCount').that.is.a('number'));"
                 ]
               }
             }
@@ -1095,7 +1177,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Returns balances array', () => pm.expect(pm.response.json()).to.have.property('balances').that.is.an('array'));"
+                  "pm.test('Returns balances array', () => pm.expect(pm.response.json().data).to.have.property('balances').that.is.an('array'));"
                 ]
               }
             }
@@ -1163,7 +1245,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Returns verified boolean', () => pm.expect(pm.response.json()).to.have.property('verified'));"
+                  "pm.test('Returns verified boolean', () => pm.expect(pm.response.json().data).to.have.property('verified'));"
                 ]
               }
             }
@@ -1237,7 +1319,7 @@
                 "exec": [
                   "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.test('status === ok', () => pm.expect(body.status).to.eql('ok'));"
+                  "pm.test('status === ok', () => pm.expect(body.data.status).to.eql('ok'));"
                 ]
               }
             }

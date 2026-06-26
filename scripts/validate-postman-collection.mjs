@@ -100,4 +100,6 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log('[validate-postman] OK — all Postman artifacts parse and have the expected shape');
+console.log(
+  '[validate-postman] OK — all Postman artifacts parse and have the expected shape',
+);
