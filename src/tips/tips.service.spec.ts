@@ -3,8 +3,24 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { TipsService } from './tips.service';
-import { Tip, TipStatus, TipAsset } from '../entities/tip.entity';
+import {
+  Tip,
+  TipStatus,
+  TipAsset,
+  TipWithdrawalStatus,
+} from '../entities/tip.entity';
 import { User } from '../entities/user.entity';
+import { StellarService } from '../stellar/stellar.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const mockStellarService = {
+  verifyPayment: jest.fn(),
+  verifyTipOnContract: jest.fn(),
+};
+
+const mockNotificationsService = {
+  notifyDiscrepancyDetected: jest.fn(),
+};
 
 describe('TipsService', () => {
   let service: TipsService;
@@ -25,6 +41,8 @@ describe('TipsService', () => {
     message: 'Great work!',
     transactionHash: null,
     status: TipStatus.PENDING,
+    withdrawalStatus: TipWithdrawalStatus.NONE,
+    withdrawalTransactionHash: null,
     createdAt: new Date(),
   };
 
@@ -38,6 +56,7 @@ describe('TipsService', () => {
   const mockTipsRepository = {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
+    find: jest.fn(),
     save: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
@@ -69,6 +88,14 @@ describe('TipsService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: StellarService,
+          useValue: mockStellarService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
       ],
     }).compile();
@@ -173,6 +200,14 @@ describe('TipsService', () => {
             provide: ConfigService,
             useValue: noIssuerConfig,
           },
+          {
+            provide: StellarService,
+            useValue: mockStellarService,
+          },
+          {
+            provide: NotificationsService,
+            useValue: mockNotificationsService,
+          },
         ],
       }).compile();
 
@@ -219,6 +254,86 @@ describe('TipsService', () => {
 
       expect(result.status).toBe(TipStatus.COMPLETED);
       expect(result.transactionHash).toBe('tx-hash-123');
+    });
+  });
+
+  describe('verifyTipOnChain', () => {
+    it('should return a matched verification result and cache it', async () => {
+      mockTipsRepository.findOne.mockResolvedValue({
+        ...mockTip,
+        creator: mockCreator,
+        transactionHash: 'tx-hash-123',
+      });
+      mockTipsRepository.find.mockResolvedValue([mockTip]);
+      mockStellarService.verifyPayment.mockResolvedValue({
+        verified: true,
+        from: 'GSENDER...',
+        to: 'GRECEIVER...',
+        amount: 100,
+        asset: 'XLM',
+        timestamp: '2026-06-22T12:00:00.000Z',
+      });
+      mockStellarService.verifyTipOnContract.mockResolvedValue({
+        exists: true,
+        from: 'GSENDER...',
+        to: 'GRECEIVER...',
+        amount: 100,
+        timestamp: '2026-06-22T12:00:00.000Z',
+      });
+
+      const result = await service.verifyTipOnChain('tip-1');
+
+      expect(result.matches).toBe(true);
+      expect(result.tipIndex).toBe(0);
+      expect(
+        mockNotificationsService.notifyDiscrepancyDetected,
+      ).not.toHaveBeenCalled();
+
+      const cached = await service.verifyTipOnChain('tip-1');
+      expect(cached.matches).toBe(true);
+      expect(mockStellarService.verifyPayment).toHaveBeenCalledTimes(1);
+      expect(mockStellarService.verifyTipOnContract).toHaveBeenCalledTimes(1);
+    });
+
+    it('should notify the creator when Horizon and contract data differ', async () => {
+      mockTipsRepository.findOne.mockResolvedValue({
+        ...mockTip,
+        creator: mockCreator,
+        transactionHash: 'tx-hash-123',
+      });
+      mockTipsRepository.find.mockResolvedValue([mockTip]);
+      mockStellarService.verifyPayment.mockResolvedValue({
+        verified: true,
+        from: 'GSENDER...',
+        to: 'GRECEIVER...',
+        amount: 100,
+        asset: 'XLM',
+        timestamp: '2026-06-22T12:00:00.000Z',
+      });
+      mockStellarService.verifyTipOnContract.mockResolvedValue({
+        exists: true,
+        from: 'GOTHER...',
+        to: 'GRECEIVER...',
+        amount: 100,
+        timestamp: '2026-06-22T12:00:00.000Z',
+      });
+      mockNotificationsService.notifyDiscrepancyDetected.mockResolvedValue(
+        {} as never,
+      );
+
+      const result = await service.verifyTipOnChain('tip-1');
+
+      expect(result.matches).toBe(false);
+      expect(
+        mockNotificationsService.notifyDiscrepancyDetected,
+      ).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({
+          tipId: 'tip-1',
+          tipIndex: 0,
+          senderWallet: 'GSENDER...',
+        }),
+      );
     });
   });
 });

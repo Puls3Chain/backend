@@ -1,0 +1,51 @@
+{
+  "name": "StellarTip",
+  "version": "1.0.0",
+  "functions": [
+    {
+      "name": "get_balance",
+      "inputs": [{ "name": "creatorAddress", "type": "string" }],
+      "outputs": [{ "type": "u64" }]
+    },
+    {
+      "name": "get_tip",
+      "inputs": [
+        { "name": "creatorAddress", "type": "string" },
+        { "name": "tipIndex", "type": "u32" }
+      ],
+      "outputs": [
+        {
+          "type": "option",
+          "value": {
+            "type": "struct",
+            "name": "TipRecord",
+            "fields": [
+              { "name": "from", "type": "string" },
+              { "name": "to", "type": "string" },
+              { "name": "amount", "type": "u64" },
+              { "name": "timestamp", "type": "string" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_tip_count",
+      "inputs": [{ "name": "creatorAddress", "type": "string" }],
+      "outputs": [{ "type": "u32" }]
+    }
+  ],
+  "types": [
+    {
+      "name": "TipRecord",
+      "kind": "struct",
+      "fields": [
+        { "name": "from", "type": "string" },
+        { "name": "to", "type": "string" },
+        { "name": "amount", "type": "u64" },
+        { "name": "timestamp", "type": "string" }
+      ]
+    }
+  ],
+  "events": []
+}

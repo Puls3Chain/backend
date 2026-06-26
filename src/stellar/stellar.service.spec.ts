@@ -1,11 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { StellarService } from './stellar.service';
 import { ConfigService } from '@nestjs/config';
+import { Tip } from '../entities/tip.entity';
+import { User } from '../entities/user.entity';
+import { TipsService } from '../tips/tips.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 jest.mock('@stellar/stellar-sdk', () => {
   const mockLoadAccount = jest.fn();
   const mockTransactionCall = jest.fn();
+  const mockGetBalance = jest.fn();
+  const mockGetTip = jest.fn();
+  const mockGetTipCount = jest.fn();
+
+  const mockContractClient = {
+    get_balance: mockGetBalance,
+    get_tip: mockGetTip,
+    get_tip_count: mockGetTipCount,
+  };
 
   return {
     Horizon: {
@@ -17,6 +31,14 @@ jest.mock('@stellar/stellar-sdk', () => {
           }),
         }),
       })),
+    },
+    rpc: {
+      Server: jest.fn().mockImplementation(() => ({})),
+    },
+    Contract: {
+      Client: {
+        from: jest.fn().mockResolvedValue(mockContractClient),
+      },
     },
     Networks: {
       TESTNET: 'TESTNET',
@@ -67,9 +89,38 @@ describe('StellarService', () => {
             get: jest.fn((key: string) => {
               if (key === 'STELLAR_NODE_URL')
                 return 'https://horizon-testnet.stellar.org';
+              if (key === 'STELLAR_SOROBAN_URL')
+                return 'https://soroban-testnet.stellar.org';
               if (key === 'STELLAR_NETWORK') return 'TESTNET';
+              if (key === 'STELLAR_CONTRACT_ID')
+                return 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
               return undefined;
             }),
+          },
+        },
+        {
+          provide: getRepositoryToken(Tip),
+          useValue: {
+            findOne: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            findOne: jest.fn(),
+          },
+        },
+        {
+          provide: TipsService,
+          useValue: {
+            createTip: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            notifyTipReceived: jest.fn(),
           },
         },
       ],
@@ -161,6 +212,46 @@ describe('StellarService', () => {
 
       const result = await service.verifyPayment('invalid-hash');
       expect(result.verified).toBe(false);
+    });
+  });
+
+  describe('verifyTipOnContract', () => {
+    it('should verify a valid contract tip record', async () => {
+      const { Contract } = await import('@stellar/stellar-sdk');
+      const mockClient = {
+        get_balance: jest.fn().mockResolvedValue({ result: 100 }),
+        get_tip_count: jest.fn().mockResolvedValue({ result: 1 }),
+        get_tip: jest.fn().mockResolvedValue({
+          result: {
+            exists: true,
+            from: 'GSOURCE...',
+            to: 'GRECEIVER...',
+            amount: 10,
+            timestamp: '2026-06-22T12:00:00.000Z',
+          },
+        }),
+      };
+      ((Contract as any).Client.from as jest.Mock).mockResolvedValueOnce(
+        mockClient,
+      );
+
+      const result = await service.verifyTipOnContract('GRECEIVER...', 0);
+
+      expect(result.exists).toBe(true);
+      expect(result.from).toBe('GSOURCE...');
+      expect(result.to).toBe('GRECEIVER...');
+      expect(result.amount).toBe(10);
+      expect(result.timestamp).toBe('2026-06-22T12:00:00.000Z');
+    });
+
+    it('should return exists: false when the contract call fails', async () => {
+      const { Contract } = await import('@stellar/stellar-sdk');
+      ((Contract as any).Client.from as jest.Mock).mockRejectedValueOnce(
+        new Error('RPC unavailable'),
+      );
+
+      const result = await service.verifyTipOnContract('GRECEIVER...', 0);
+      expect(result.exists).toBe(false);
     });
   });
 });

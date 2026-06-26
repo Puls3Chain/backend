@@ -3,6 +3,8 @@
 The NestJS backend for [StellarTip](https://stellartip.com) — a decentralized micro-tipping platform for creators on the Stellar ecosystem.
 
 [![CI](https://github.com/StellarTips/StellarTip-Backend/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarTips/StellarTip-Backend/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/StellarTips/StellarTip-Backend)](https://github.com/StellarTips/StellarTip-Backend/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/StellarTips/StellarTip-Backend/total)](https://github.com/StellarTips/StellarTip-Backend/releases)
 
 ## Overview
 
