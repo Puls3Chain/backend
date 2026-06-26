@@ -4,8 +4,15 @@ import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
-import { StructuredLogger } from './shared/logging/logging.config';
 import { configureSecurity } from './config/security.config';
+import { StructuredLogger } from './shared/logging/logging.config';
+import {
+  initSentry,
+  registerSentryErrorHandler,
+  registerSentryHandlers,
+} from './sentry';
+
+initSentry();
 
 async function bootstrap(): Promise<void> {
   const appLogger = new StructuredLogger();
@@ -16,7 +23,9 @@ async function bootstrap(): Promise<void> {
       rawBody: true,
     });
 
-    // Security headers and CORS
+    registerSentryHandlers(app);
+
+    // Security headers
     configureSecurity(app);
 
     // Response compression
@@ -58,6 +67,8 @@ async function bootstrap(): Promise<void> {
         persistAuthorization: true,
       },
     });
+
+    registerSentryErrorHandler(app);
 
     const port = process.env.PORT || 3000;
     await app.listen(port);
