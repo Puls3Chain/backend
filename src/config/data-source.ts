@@ -15,4 +15,16 @@ export default new DataSource({
   migrationsTableName: 'typeorm_migrations',
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
+  // Wrap each migration in its own transaction by default so partial
+  // failures roll back cleanly, while still letting individual migrations
+  // opt out via `public readonly transaction = false` on the class.
+  //
+  // This is required by `AddPerformanceIndexes1750464000000`, which uses
+  // `CREATE INDEX CONCURRENTLY` — Postgres refuses to run those inside a
+  // transaction. Under TypeORM's default `migrationsTransactionMode: 'all'`
+  // the per-class opt-out raises
+  // `ForbiddenTransactionModeOverrideError` and the Newman CI job
+  // (`postman-tests.yml` → `npm run migration:run`) aborts before the
+  // requests are even exercised.
+  migrationsTransactionMode: 'each',
 });
