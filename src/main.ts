@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
+import { configureSecurity } from './config/security.config';
 import { StructuredLogger } from './shared/logging/logging.config';
 import {
   initSentry,
@@ -25,7 +26,7 @@ async function bootstrap(): Promise<void> {
     registerSentryHandlers(app);
 
     // Security headers
-    app.use(helmet());
+    configureSecurity(app);
 
     // Response compression
     app.use(compression());
