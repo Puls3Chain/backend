@@ -117,15 +117,19 @@ The seed script truncates existing seeded tables before inserting data so repeat
 
 ## Scripts
 
-| Command             | Description                      |
-| ------------------- | -------------------------------- |
-| `npm run start:dev` | Start development server (watch) |
-| `npm run build`     | Build for production             |
-| `npm run start`     | Start production server          |
-| `npm test`          | Run unit tests                   |
-| `npm run test:e2e`  | Run end-to-end tests             |
-| `npm run lint`      | Lint and auto-fix code           |
-| `npm run db:seed`   | Seed development/demo data       |
+| Command                        | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `npm run start:dev`            | Start development server (watch)              |
+| `npm run build`                | Build for production                          |
+| `npm run start`                | Start production server                       |
+| `npm test`                     | Run unit tests                                |
+| `npm run test:e2e`             | Run end-to-end tests                          |
+| `npm run test:postman`         | Run the Postman Newman collection (dev env)   |
+| `npm run test:postman:staging` | Run Newman against the staging environment    |
+| `npm run test:postman:prod`    | Run Newman against the production environment |
+| `npm run audit:ci`             | Mirror the CI `npm audit` gate locally        |
+| `npm run lint`                 | Lint and auto-fix code                        |
+| `npm run db:seed`              | Seed development/demo data                    |
 
 ## API Endpoints
 
@@ -231,6 +235,84 @@ Check our public status page at [status.stellartip.com](https://status.stellarti
 ## API Documentation
 
 Interactive Swagger UI is available at `/api/docs` when the server is running.
+
+## API exploration with Postman
+
+A versioned [Postman](https://www.postman.com/) collection lives under
+[`postman/`](./postman/):
+
+- `postman/StellarTip.postman_collection.json` — all endpoints grouped by
+  controller (Auth, Profiles, Tips, Notifications, Stellar, Health + a
+  `Welcome` smoke test).
+- `postman/environments/{dev,staging,prod}.json` — one-click environments
+  that pre-fill `baseUrl`, the active network and placeholders for the
+  bearer tokens.
+
+### Import into Postman
+
+1. **File → Import** the collection JSON.
+2. **Environments → Import** one or more of the environment files.
+3. Open `Auth → POST /auth/signup` (or `/auth/login`) and click **Send**.
+   The collection's auth helper captures the response token into
+   `accessToken` so every following request sends `Authorization: Bearer
+{{accessToken}}` automatically.
+
+### Running Newman from the CLI
+
+Newman reproduces the collection in a headless runner. Requires Node ≥ 18:
+
+```bash
+npm run test:postman            # dev (http://localhost:3000)
+npm run test:postman:staging    # api.staging.stellartip.dev
+npm run test:postman:prod       # api.stellartip.dev
+```
+
+Or directly:
+
+```bash
+bash scripts/run-postman.sh dev
+```
+
+Each run writes a JUnit report to `postman/reports/newman-<env>.xml`
+suitable for CI ingestion.
+
+### Regenerating from the OpenAPI spec
+
+The collection is hand-curated so that every request ships with example
+payloads, schema assertions and a no-server-needed smoke test. To refresh
+its shape from the live `/api/docs-json` spec use
+[`openapi-to-postman`](https://github.com/postmanlabs/openapi-to-postman):
+
+```bash
+openapi2postman -s http://localhost:3000/api/docs-json -o postman/StellarTip.postman_collection.json -p
+npm run test:postman
+```
+
+Review the diff and merge tests, descriptions and example bodies that were
+authored manually.
+
+### Postman in CI
+
+`.github/workflows/postman-tests.yml` boots Postgres + the API and runs
+the Newman collection on every push to `main` and on every PR. JUnit XML
+is uploaded as a workflow artifact (`newman-junit-report`).
+
+## Security scanning
+
+The dependency vulnerability management policy is documented in
+[`docs/SECURITY.md`](./docs/SECURITY.md#dependency-vulnerability-management)
+and enforced by:
+
+- `.github/workflows/security-audit.yml` — `npm audit` (prod deps) on every
+  PR / push to `main`, plus CodeQL `security-and-quality`. Optional Snyk
+  steps run only when `SNYK_TOKEN` is configured at the repository level.
+- `.github/workflows/security-drift.yml` — weekly Monday 01:00 UTC cron
+  audit of the **full** dep tree. Opens a `security,weekly-drift` issue
+  while drift is present and auto-closes it on the next clean run.
+
+Suppressions of individual findings belong in [`./.snyk`](./.snyk) with an
+explicit `reason` and `expires` (≤ 90 days out). See `docs/SECURITY.md`
+for the full policy and response SLA.
 
 ## License
 

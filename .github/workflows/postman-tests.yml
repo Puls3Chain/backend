@@ -1,0 +1,106 @@
+name: Postman Tests
+
+# Spins up Postgres + the API on localhost and runs the Newman collection
+# against the dev environment, asserting every request's `test` block.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  newman:
+    name: Newman (StellarTip.postman_collection.json)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellartip_postman
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: stellartip_postman
+      JWT_SECRET: postman-runner-secret
+      NODE_ENV: development
+      # Use testnet endpoints so wallet reads don't require a published account.
+      STELLAR_NETWORK: testnet
+      STELLAR_NODE_URL: https://horizon-testnet.stellar.org
+      THROTTLE_TTL: 60000
+      # Intentionally raised for the Newman runner so the ~33-request
+      # suite does not burst against @nestjs/throttler. Pair this with
+      # `--global-delay 200` in scripts/run-postman.sh so requests stay
+      # spread over the throttle window. Never change locally without
+      # revisiting the runner delay in tandem.
+      THROTTLE_LIMIT: 1000
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Run migrations
+        run: npm run migration:run
+      # Start the API in the background and wait until /health/ready returns 200.
+      # Postman tests assume the server is reachable on http://localhost:3000.
+      - name: Launch API server
+        run: |
+          set -euo pipefail
+          node -r tsconfig-paths/register dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+      - name: Wait for readiness
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/health/ready >/dev/null; then
+              echo "API ready after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to become ready" >&2
+          cat api.log >&2
+          exit 1
+      - name: Run Newman (dev environment)
+        run: npm run test:postman:dev
+      - name: Upload Newman JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-junit-report
+          path: postman/reports/newman-dev.xml
+          retention-days: 14
+          if-no-files-found: error
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" || true
+          fi
