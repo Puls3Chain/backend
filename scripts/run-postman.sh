@@ -56,9 +56,13 @@ mkdir -p "${REPORT_DIR}"
 #  * `--bail` short-circuits at the first failing request — matches the
 #    'exits with a non-zero code on failure' acceptance criterion and keeps CI
 #    feedback fast.
-#  * `--global-delay 200` adds a small wait between requests so we don't trip
+#  * `--delay-request 200` adds a small wait between requests so we don't trip
 #    the @nestjs/throttler on shared dev/staging instances (the CI workflow
 #    temporarily raises THROTTLE_LIMIT to 1000 to compensate).
+#    NOTE: Newman's old `--global-delay` flag was renamed to `--delay-request`
+#    in Newman 5.x; the legacy option silently crashes (`unknown option`) in
+#    Newman 6.x. Keep the modern name here so the runner works on the
+#    pinned `newman@^6.2.1` devDep in package.json.
 #  * Reporters produce both the human-readable CLI summary AND a JUnit XML so
 #    CI runners can render a structured failure table.
 #  * `npx --no-install newman` uses the locally installed binary from the
@@ -69,5 +73,5 @@ npx --no-install newman run "${COLLECTION}" \
   --environment "${ENV_FILE}" \
   --reporters cli,junit \
   --reporter-junit-export "${REPORT_DIR}/newman-${ENVIRONMENT}.xml" \
-  --global-delay 200 \
+  --delay-request 200 \
   --bail
