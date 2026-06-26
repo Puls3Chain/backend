@@ -62,7 +62,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Sync drift issue (open while dirty, close when clean)
-        uses: actions/github-script@v7
+        # v8 ships Node 20 and tracks current GitHub API features; v7 is
+        # still supported but no longer the recommended default.
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

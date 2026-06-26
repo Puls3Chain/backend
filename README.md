@@ -117,19 +117,21 @@ The seed script truncates existing seeded tables before inserting data so repeat
 
 ## Scripts
 
-| Command                        | Description                                   |
-| ------------------------------ | --------------------------------------------- |
-| `npm run start:dev`            | Start development server (watch)              |
-| `npm run build`                | Build for production                          |
-| `npm run start`                | Start production server                       |
-| `npm test`                     | Run unit tests                                |
-| `npm run test:e2e`             | Run end-to-end tests                          |
-| `npm run test:postman`         | Run the Postman Newman collection (dev env)   |
-| `npm run test:postman:staging` | Run Newman against the staging environment    |
-| `npm run test:postman:prod`    | Run Newman against the production environment |
-| `npm run audit:ci`             | Mirror the CI `npm audit` gate locally        |
-| `npm run lint`                 | Lint and auto-fix code                        |
-| `npm run db:seed`              | Seed development/demo data                    |
+| Command                        | Description                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `npm run start:dev`            | Start development server (watch)                                                          |
+| `npm run build`                | Build for production                                                                      |
+| `npm run start`                | Start production server                                                                   |
+| `npm test`                     | Run unit tests                                                                            |
+| `npm run test:e2e`             | Run end-to-end tests                                                                      |
+| `npm run test:postman`         | Run the Postman Newman collection (dev env)                                               |
+| `npm run test:postman:staging` | Run Newman against the staging environment                                                |
+| `npm run test:postman:prod`    | Run Newman against the production environment                                             |
+| `npm run postman:generate`     | Regenerate a baseline Postman collection from `/api/docs-json` (writes to `postman/tmp/`) |
+| `npm run postman:validate`     | Structural validation of every Postman artifact under `postman/`                          |
+| `npm run audit:ci`             | Mirror the CI `npm audit` gate locally                                                    |
+| `npm run lint`                 | Lint and auto-fix code                                                                    |
+| `npm run db:seed`              | Seed development/demo data                                                                |
 
 ## API Endpoints
 
@@ -278,18 +280,31 @@ suitable for CI ingestion.
 
 ### Regenerating from the OpenAPI spec
 
-The collection is hand-curated so that every request ships with example
-payloads, schema assertions and a no-server-needed smoke test. To refresh
-its shape from the live `/api/docs-json` spec use
-[`openapi-to-postman`](https://github.com/postmanlabs/openapi-to-postman):
+The collection in this repo is hand-curated so that every request ships
+with example payloads, schema assertions and a no-server-needed smoke test.
+The OpenAPI-→-Postman transformer supplied by Postman Labs is installed as
+`openapi-to-postmanv2` (binary `openapi2postmanv2`) so a fresh baseline
+can be regenerated on demand:
 
 ```bash
-openapi2postman -s http://localhost:3000/api/docs-json -o postman/StellarTip.postman_collection.json -p
-npm run test:postman
+# 1. Boot the API so /api/docs-json is reachable.
+npm run start:dev
+
+# 2. Generate a *scratch* baseline from the live OpenAPI spec.
+BASE_URL=http://localhost:3000 npm run postman:generate
+
+# 3. Diff against the hand-curated collection and migrate any genuinely
+#    new endpoints / parameters. NEVER auto-merge — that would lose the
+#    pm.test assertions and example bodies.
+diff -u postman/StellarTip.postman_collection.json \
+        postman/tmp/StellarTip.generated.postman_collection.json
 ```
 
-Review the diff and merge tests, descriptions and example bodies that were
-authored manually.
+`npm run postman:validate` parses every JSON file under `postman/` and
+asserts that collections expose an `auth` helper and a top-level `item`
+array while environments expose `_postman_variable_scope='environment'` —
+it is wired into `lint-staged` so a malformed artifact cannot land via a
+"format only" commit.
 
 ### Postman in CI
 

@@ -94,7 +94,10 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
+        # Pinned by SHA per the GitHub Hardening Guide (best practice for
+        # third-party actions). Update deliberately during reviews.
+        # real SHA for snyk/actions@master as of June 2026 — re-pin on upgrade.
+        uses: snyk/actions/setup@8e119fbb6c251787721d34ba683edeba792766 # master
       - name: Run Snyk vulnerability test
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -138,7 +141,10 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
+        # Pinned by SHA per the GitHub Hardening Guide (best practice for
+        # third-party actions). Update deliberately during reviews.
+        # real SHA for snyk/actions@master as of June 2026 — re-pin on upgrade.
+        uses: snyk/actions/setup@8e119fbb6c251787721d34ba683edeba792766 # master
       - name: Snapshot to Snyk
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

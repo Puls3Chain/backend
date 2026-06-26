@@ -1,5 +1,5 @@
 # Snyk policy file (https://docs.snyk.io/manage-issues/policies/the-.snyk-file)
-# Version: v1.0.0 schema.
+# Version: v1.1.0 schema.
 #
 # Goal: by default `snyk test` should treat every vulnerability as active and
 # let the `--severity-threshold=high` flag fail the gate. The empty `ignore`
