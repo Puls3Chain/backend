@@ -58,7 +58,9 @@ jobs:
         run: npm run build
 
       - name: Start API server
-        run: node dist/main.js &
+        # Match the actual `nest build` output (NestJS CLI 11 + sourceRoot: "src"):
+        # the entry lives at dist/src/main.js, not dist/main.js.
+        run: node -r tsconfig-paths/register dist/src/main.js &
         env:
           PORT: 3000
 

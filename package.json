@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch --exec 'node -r tsconfig-paths/register -r ts-node/register'",
     "start:debug": "nest start --debug --watch --exec 'node -r tsconfig-paths/register -r ts-node/register'",
-    "start:prod": "node -r tsconfig-paths/register dist/main",
+    "start:prod": "node -r tsconfig-paths/register dist/src/main",
     "lint": "eslint \"{src,apps,libs,test,scripts}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",

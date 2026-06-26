@@ -73,7 +73,10 @@ jobs:
       - name: Launch API server
         run: |
           set -euo pipefail
-          node -r tsconfig-paths/register dist/main.js > api.log 2>&1 &
+          # `nest build` (NestJS CLI 11 + sourceRoot: "src") emits the
+          # entry under `dist/src/main.js`, not `dist/main.js`. Launch
+          # from there so the API is reachable on http://localhost:3000.
+          node -r tsconfig-paths/register dist/src/main.js > api.log 2>&1 &
           echo $! > api.pid
       - name: Wait for readiness
         run: |
