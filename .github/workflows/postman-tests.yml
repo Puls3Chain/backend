@@ -51,9 +51,10 @@ jobs:
       THROTTLE_TTL: 60000
       # Intentionally raised for the Newman runner so the ~33-request
       # suite does not burst against @nestjs/throttler. Pair this with
-      # `--global-delay 200` in scripts/run-postman.sh so requests stay
-      # spread over the throttle window. Never change locally without
-      # revisiting the runner delay in tandem.
+      # `--delay-request 200` in scripts/run-postman.sh so requests stay
+      # spread over the throttle window. (Newman 6.x renamed
+      # `--global-delay` to `--delay-request`.) Never change locally
+      # without revisiting the runner delay in tandem.
       THROTTLE_LIMIT: 1000
       PORT: 3000
     steps:

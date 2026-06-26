@@ -314,8 +314,8 @@ and enforced by:
   PR / push to `main`, plus CodeQL `security-and-quality`. Optional Snyk
   steps run only when `SNYK_TOKEN` is configured at the repository level.
 - `.github/workflows/security-drift.yml` — weekly Monday 01:00 UTC cron
-  audit of the **full** dep tree. Opens a `security,weekly-drift` issue
-  while drift is present and auto-closes it on the next clean run.
+  audit of the **full** dep tree. Opens a `security`-labelled issue while
+  drift is present and auto-closes it on the next clean run.
 
 Suppressions of individual findings belong in [`./.snyk`](./.snyk) with an
 explicit `reason` and `expires` (≤ 90 days out). See `docs/SECURITY.md`

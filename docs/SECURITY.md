@@ -130,6 +130,7 @@ and also on `workflow_dispatch`.
 - The `drift-detect` job runs `npm audit --audit-level=high` against the
   full dep tree and uploads the raw JSON as a workflow artifact (90-day
   retention).
-- The `drift-issue` job opens (or keeps) a single `security,weekly-drift`
-  labelled issue describing the drift and closes any previous one when the
-  next run is clean.
+- The `drift-issue` job opens (or keeps) a single `security`-labelled issue
+  describing the drift and closes any previous one when the next run is
+  clean. The job creates the `security` label defensively if it does not
+  exist yet, so the workflow never 422s on a fresh fork.
