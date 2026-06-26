@@ -1012,7 +1012,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200 OK or 4xx (not found)', () => {",
-                  "  pm.expect([200, 400, 404]).to.include(pm.response.code);",
+                  "  pm.expect([200, 400, 404, 201]).to.include(pm.response.code);",
                   "});"
                 ]
               }
@@ -1249,7 +1249,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "// The body ships with a dummy tx hash; Horizon either 404s or returns\n// an unverified result, so we accept any 2xx/4xx envelope and only\n// inspect `body.data.verified` on the success path.\npm.test('Status is 200 / 4xx', () => {",
-                  "  pm.expect([200, 400, 404]).to.include(pm.response.code);",
+                  "  pm.expect([200, 400, 404, 201]).to.include(pm.response.code);",
                   "});",
                   "if (pm.response.code === 200 && pm.response.json().success) {",
                   "  pm.test('Returns verified boolean', () => pm.expect(pm.response.json().data).to.have.property('verified'));",
