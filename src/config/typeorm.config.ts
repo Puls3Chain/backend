@@ -20,6 +20,12 @@ const config: TypeOrmModuleOptions = {
   logging: !isProduction,
   logger: 'advanced-console',
   autoLoadEntities: true,
+  // See `src/config/data-source.ts` for the rationale. This keeps the
+  // production bootstrap (`migrationsRun: isProduction`) consistent with
+  // the CLI used by `npm run migration:run` and the Newman CI workflow,
+  // so the opt-out on `AddPerformanceIndexes1750464000000` is honoured
+  // in every code path that actually applies migrations.
+  migrationsTransactionMode: 'each',
 };
 
 export default config;

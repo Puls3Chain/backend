@@ -1,4 +1,9 @@
 {
   "*.ts": ["eslint --fix", "prettier --write"],
-  "*.{json,md,yaml,yml}": ["prettier --write"]
+  "*.{json,md,yaml,yml}": ["prettier --write"],
+  "postman/**/*.json": [
+    "prettier --write",
+    "node scripts/validate-postman-collection.mjs"
+  ],
+  "scripts/*.sh": ["bash -n"]
 }

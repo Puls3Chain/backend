@@ -38,8 +38,9 @@ check "release.yml tags GHCR image with latest" grep -Eq 'IMAGE_NAME.*:latest|st
 check "release.yml verifies migrations" grep -q "migration:run" .github/workflows/release.yml
 check "package.json has migration:run script" node -e "const p=require('./package.json'); process.exit(p.scripts['migration:run']?0:1)"
 check "release-please config includes feat section" node -e "const c=require('./release-please-config.json'); process.exit(c.packages['.']['changelog-sections'].some(s=>s.type==='feat')?0:1)"
-check "dist data-source compiled" test -f dist/config/data-source.js
-check "dist migration compiled" test -f dist/migrations/1740000000000-InitialSchema.js
+check "dist entry compiled" test -f dist/src/main.js
+check "dist data-source compiled" test -f dist/src/config/data-source.js
+check "dist migration compiled" test -f dist/src/migrations/1740000000000-InitialSchema.js
 check "commitlint accepts conventional commit" bash -c 'echo "feat: test release setup" | npx --no commitlint >/dev/null'
 check "commitlint rejects invalid commit" bash -c '! echo "bad commit message" | npx --no commitlint >/dev/null 2>&1'
 

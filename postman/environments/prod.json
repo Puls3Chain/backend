@@ -1,0 +1,58 @@
+{
+  "id": "stellartip-env-prod",
+  "name": "StellarTip — Prod",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.stellartip.dev",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "network",
+      "value": "PUBLIC",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "publicUsername",
+      "value": "stellartip",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "tipId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2025-01-15T00:00:00.000Z",
+  "_postman_exported_using": "Postman/10.0.0",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+}

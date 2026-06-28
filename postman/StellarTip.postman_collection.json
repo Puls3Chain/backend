@@ -1,0 +1,1460 @@
+{
+  "info": {
+    "name": "StellarTip API",
+    "_postman_id": "3a7b2f12-1c8d-4f29-9b3a-8a3f1c6d2eab",
+    "description": "StellarTip API exploration collection.\n\nEvery request runs against `{{baseUrl}}` and authenticates with a bearer\ntoken from the active environment's `accessToken` variable. Run `Auth →\nLogin` (or `Signup`) first so the token is captured into the environment\nby the request's test script; subsequent folder requests pick it up\nautomatically.\n\nFolders mirror the controllers in `src/`:\n\n- **Auth** — JWT + Stellar wallet authentication\n- **Profiles** — Creator profile management\n- **Tips** — Tip creation, history, statistics, verification\n- **Notifications** — In-app notification inbox\n- **Stellar** — Horizon / Soroban contract interactions\n- **Health** — Liveness, readiness and Stellar remote probes\n\nThe `Welcome` request is a quick smoke test for a freshly started server.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Welcome",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Root health/landing endpoint exposed by `AppController`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 2xx', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "// use `body`, not `data` -- `data` is reserved by Postman Sandbox (iteration data); `const data` raises SyntaxError under Newman 6.x",
+                  "const body = pm.response.json();",
+                  "pm.test('Response has data field', () => {",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('data');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/",
+                  "host": ["{{baseUrl}}"],
+                  "path": [""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Welcome to the StellarTip API\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Account creation, login (email/password OR Stellar wallet), nonce issuance and token refresh. The Login and Stellar Login requests capture tokens into the environment so subsequent folders work without further setup.",
+      "item": [
+        {
+          "name": "POST /auth/signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@stellartip.dev\",\n  \"password\": \"correct-horse-battery-staple\",\n  \"username\": \"alice\",\n  \"displayName\": \"Alice the Creator\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "signup"]
+            },
+            "description": "Create a new email/password account and receive a JWT pair. The test script below stores both tokens in the active environment so subsequent requests don't need manual configuration."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "// The shared ResponseInterceptor wraps every success body in",
+                  "// { success, statusCode, data, requestId, timestamp }, so the",
+                  "// JWT pair lives under `body.data`, not at the top level.",
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "pm.test('Returns refresh_token', () => pm.expect(body.data).to.have.property('refresh_token').that.is.a('string'));",
+                  "// Guard with `body.success` so the chained folder requests still run",
+                  "// when signup fails (e.g. 409 Conflict on a retry run).",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}",
+                  "if (body.success && body.data && body.data.user && body.data.user.id) {",
+                  "  pm.environment.set('userId', body.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"alice@stellartip.dev\",\n  \"password\": \"correct-horse-battery-staple\",\n  \"username\": \"alice\",\n  \"displayName\": \"Alice\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/signup",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "signup"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_abc123...\",\n    \"expires_in\": 900,\n    \"user\": {\n      \"id\": \"7c1c0000-1111-2222-3333-444455556666\",\n      \"email\": \"alice@stellartip.dev\",\n      \"username\": \"alice\",\n      \"displayName\": \"Alice\",\n      \"role\": \"user\"\n    }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
+            },
+            {
+              "name": "409 Conflict (email taken)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/signup",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "signup"]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 409,\n  \"message\": \"Email or username already in use\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@stellartip.dev\",\n  \"password\": \"correct-horse-battery-staple\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Exchange email/password for a fresh JWT pair. Like Signup, the test script stores both tokens in the environment so chained requests remain authenticated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "// Mirror /auth/signup: only capture tokens on a real success envelope so",
+                  "// 401 / 400 / 503 responses don't wipe the env for the next request.",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_xyz789...\",\n    \"expires_in\": 900,\n    \"user\": { \"id\": \"7c1c0000-1111-2222-3333-444455556666\" }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
+            },
+            {
+              "name": "401 Invalid credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Invalid credentials\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/stellar/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"walletAddress\": \"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/stellar/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "stellar", "login"]
+            },
+            "description": "Dev/test convenience endpoint that performs wallet login without signature verification. In production, Freighter signs the nonce returned by `/auth/nonce` and the signed payload is exchanged for tokens here."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "pm.test('Returns access_token', () => pm.expect(body.data).to.have.property('access_token').that.is.a('string'));",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"walletAddress\": \"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/stellar/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "stellar", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOi...\",\n    \"refresh_token\": \"rt_stellar01...\",\n    \"expires_in\": 900,\n    \"user\": { \"id\": \"7c1c2222-3333-4444-5555-666677778888\" }\n  },\n  \"requestId\": \"req_example_000000\",\n  \"timestamp\": \"2025-01-15T12:00:00.000Z\"\n}"
+            },
+            {
+              "name": "400 Invalid Stellar address",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Invalid Stellar wallet address format\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Trade a refresh token for a fresh access token (and a rotated refresh token)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// NestJS POST default is 201 Created; accept either.",
+                  "pm.test('Status is 200 OK or 201 Created', () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "// Refresh can return 401 if the token has been rotated out from under us --",
+                  "// only update the env vars on a real success envelope.",
+                  "if (body.success && body.data && body.data.access_token) {",
+                  "  pm.environment.set('accessToken', body.data.access_token);",
+                  "  pm.environment.set('refreshToken', body.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /auth/nonce",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/nonce?walletAddress=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "nonce"],
+              "query": [
+                {
+                  "key": "walletAddress",
+                  "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                  "description": "56-char Stellar public address starting with G"
+                }
+              ]
+            },
+            "description": "Issue a one-time signing nonce that Freighter signs before submitting to `/auth/stellar/login`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns nonce and message', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data).to.have.property('nonce').that.is.a('string');",
+                  "  pm.expect(body.data).to.have.property('message').that.is.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /auth/profile (auth)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            },
+            "description": "Resolve the JWT in the `Authorization` header to its owning user. Used by integrations to verify token validity quickly."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns user object', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data).to.have.property('id');",
+                  "  pm.expect(body.data).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "description": "Search and manage creator profiles. Routes prefixed with `/me/` require an `Authorization: Bearer {{accessToken}}` header (handled automatically by the collection-level auth).",
+      "item": [
+        {
+          "name": "GET /profiles/:username",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/profiles/{{publicUsername}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "{{publicUsername}}"],
+              "variable": [
+                {
+                  "key": "publicUsername",
+                  "value": "alice"
+                }
+              ]
+            },
+            "description": "Public profile read by username. Returns a sanitized `User` record."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns a User-shaped object', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data).to.have.property('username');",
+                  "  pm.expect(body.data).to.have.property('displayName');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /profiles/:username/tipping-info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/profiles/{{publicUsername}}/tipping-info",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "{{publicUsername}}", "tipping-info"],
+              "variable": [
+                {
+                  "key": "publicUsername",
+                  "value": "alice"
+                }
+              ]
+            },
+            "description": "Lightweight, cache-friendly payload for the public tipping landing page (display name, bio, avatar URL, supported assets)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Body is JSON object', () => pm.expect(pm.response.json().data).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /profiles?q=",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/profiles?q=alice",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "alice",
+                  "description": "Search term; matches against username and displayName"
+                }
+              ]
+            },
+            "description": "Fuzzy search creators by username/display name."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns an array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "PUT /profiles/me (auth)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alice the Creator\",\n  \"bio\": \"Helping people discover Stellar every day.\",\n  \"avatarUrl\": \"https://cdn.stellartip.dev/avatars/alice.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            },
+            "description": "Full replace for the authenticated user's own profile. Freeform fields are sanitized by `text-sanitizer` per `docs/SECURITY.md`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('displayName persisted', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.displayName).to.eql('Alice the Creator');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "PATCH /profiles/me/social-links (auth)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"twitter\": \"https://twitter.com/alice\",\n  \"github\": \"https://github.com/alice\",\n  \"website\": \"https://alice.stellartip.dev\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me/social-links",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me", "social-links"]
+            },
+            "description": "Partial update of social link URLs. Each URL must be HTTPS."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /profiles/me/avatar (auth)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me", "avatar"]
+            },
+            "description": "Upload an avatar. Accepts JPEG/PNG/WEBP up to 5 MB. Attach a file in the Postman UI before sending."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Avatar upload requires a real multipart file in Newman, which the\n// collection can't supply, so accept any reasonable 4xx (validation, file\n// type guard etc.) as well as a 201. To exercise the full happy path,\n// attach a JPEG/PNG/WEBP up to 5 MB from the Postman UI.\npm.test('Status is 201 / 4xx (no file attached in Newman)', () => {",
+                  "  pm.expect([201, 400, 415]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /profiles/me/analytics (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me/analytics?period=30d&asset=XLM",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me", "analytics"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30d",
+                  "description": "7d | 30d | 90d | 365d | all"
+                },
+                {
+                  "key": "asset",
+                  "value": "XLM",
+                  "description": "Optional asset filter: XLM or USDC"
+                }
+              ]
+            },
+            "description": "Aggregated tip analytics for the authenticated creator (cached 5 minutes via `@nestjs/cache-manager`). Returns summary, byAsset, timeSeries and topSupporters blocks."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "// The analytics payload { summary, byAsset, timeSeries, topSupporters }",
+                  "// is wrapped by ResponseInterceptor -> the object lives under `body.data`.",
+                  "// The summary block carries `totalTipsReceived`, not `totalTips` --",
+                  "// the analytics service emits the former to keep the metric unambiguous.",
+                  "pm.test('Has summary block', () => {",
+                  "  pm.expect(body.data).to.have.property('summary').that.is.an('object');",
+                  "});",
+                  "pm.test('summary.totalTipsReceived is numeric', () => {",
+                  "  pm.expect(body.data.summary).to.have.property('totalTipsReceived').that.is.a('number');",
+                  "});",
+                  "pm.test('Has byAsset array', () => pm.expect(body.data.byAsset).to.be.an('array'));",
+                  "pm.test('Has timeSeries array', () => pm.expect(body.data.timeSeries).to.be.an('array'));",
+                  "pm.test('Has topSupporters array', () => pm.expect(body.data.topSupporters).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tips",
+      "description": "Tip creation, history, statistics, transaction confirmation and on-chain verification. Bearer-required requests use the token captured during the Auth folder's Login/Signup.",
+      "item": [
+        {
+          "name": "POST /tips",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverWallet\": \"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"senderWallet\": \"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"amount\": 10.5,\n  \"asset\": \"XLM\",\n  \"message\": \"Great tutorial on Stellar!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tips",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips"]
+            },
+            "description": "Record a tip. Either `senderWallet` or `transactionHash` is required. Returns the persisted `Tip` entity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('Returns tip id', () => pm.expect(body.data.id).to.exist);",
+                  "pm.environment.set('tipId', body.data.id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /tips/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/{{tipId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "{{tipId}}"]
+            },
+            "description": "Fetch a single tip by its UUID. Public; no auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 404 Not Found', () => {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /tips/my/received (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/my/received?page=1&limit=20&sortBy=createdAt&sortOrder=DESC",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "my", "received"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "DESC"
+                }
+              ]
+            },
+            "description": "Tips received by the authenticated user. Paginated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has paginated shape', () => {",
+                  "  const body = pm.response.json();",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /tips/my/sent (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/my/sent?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "my", "sent"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Tips sent by the authenticated user. Paginated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has paginated shape', () => {",
+                  "  const body = pm.response.json();",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /tips/wallet/:walletAddress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/wallet/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "tips",
+                "wallet",
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Tips associated with a Stellar wallet address. Public so tipping-page widgets can render history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has paginated shape', () => {",
+                  "  const body = pm.response.json();",
+                  "// Pagination wrapper { data, total, page, limit, totalPages, hasNextPage, hasPreviousPage }",
+                  "// is wrapped by ResponseInterceptor -> lives under `body.data`.",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "  pm.expect(body.data).to.have.property('data').that.is.an('array');",
+                  "  pm.expect(body.data).to.have.property('total').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('page').that.is.a('number');",
+                  "  pm.expect(body.data).to.have.property('limit').that.is.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /tips/my/stats (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/my/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "my", "stats"]
+            },
+            "description": "Tip totals grouped by asset for the authenticated user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array of asset groups', () => {",
+                  "  const body = pm.response.json();",
+                  "// stats is an array at the service layer -> wrapped by ResponseInterceptor",
+                  "// -> the array is reachable through `body.data`.",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  if (body.data.length) pm.expect(body.data[0]).to.have.property('asset');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /tips/:id/confirm (auth)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionHash\": \"a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef0\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tips/{{tipId}}/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "{{tipId}}", "confirm"]
+            },
+            "description": "Attach a Stellar transaction hash to a previously-recorded tip. Triggers Horizon verification."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 4xx (not found)', () => {",
+                  "  pm.expect([200, 400, 404, 201]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /tips/:id/verify-onchain",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tips/{{tipId}}/verify-onchain",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", "{{tipId}}", "verify-onchain"]
+            },
+            "description": "Independently verify a tip against the Horizon ledger AND the Soroban contract."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 4xx', () => {",
+                  "  pm.expect([200, 201, 400, 404]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Returns verified boolean', () => pm.expect(pm.response.json().data).to.have.property('verified'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "In-app inbox. All endpoints require a `Bearer {{accessToken}}`.",
+      "item": [
+        {
+          "name": "GET /notifications (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Paginated inbox."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has paginated shape', () => pm.expect(pm.response.json().data).to.have.property('data'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /notifications/unread-count (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unread-count"]
+            },
+            "description": "Lightweight badge endpoint. Returns `{ unreadCount: number }`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns unreadCount', () => pm.expect(pm.response.json().data).to.have.property('unreadCount').that.is.a('number'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "PATCH /notifications/:id/read (auth)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}", "read"]
+            },
+            "description": "Mark a single notification as read."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 4xx', () => {",
+                  "  pm.expect([200, 400, 404, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stellar",
+      "description": "Horizon-backed Stellar reads plus the Soroban contract webhook. The `POST /stellar/contract/webhook` request sends a signed payload; verification is gated by the `x-stellar-signature` header.",
+      "item": [
+        {
+          "name": "GET /stellar/balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stellar/balance?walletAddress=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "host": ["{{baseUrl}}"],
+              "path": ["stellar", "balance"],
+              "query": [
+                {
+                  "key": "walletAddress",
+                  "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }
+              ]
+            },
+            "description": "Returns XLM + native asset balances for a wallet address."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns balances array', () => pm.expect(pm.response.json().data).to.have.property('balances').that.is.an('array'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /stellar/account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stellar/account?walletAddress=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "host": ["{{baseUrl}}"],
+              "path": ["stellar", "account"],
+              "query": [
+                {
+                  "key": "walletAddress",
+                  "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }
+              ]
+            },
+            "description": "Returns account info, sequence number, subentry count and the active Stellar network."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 404 Not Found', () => {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /stellar/verify-payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionHash\": \"a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef0\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stellar/verify-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["stellar", "verify-payment"]
+            },
+            "description": "Re-fetch a transaction from Horizon and report sender, recipient, amount and asset."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The body ships with a dummy tx hash; Horizon either 404s or returns\n// an unverified result, so we accept any 2xx/4xx envelope and only\n// inspect `body.data.verified` on the success path.\npm.test('Status is 200 / 4xx', () => {",
+                  "  pm.expect([200, 400, 404, 201]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200 && pm.response.json().success) {",
+                  "  pm.test('Returns verified boolean', () => pm.expect(pm.response.json().data).to.have.property('verified'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /stellar/contract/webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-stellar-signature",
+                "value": "REPLACE_WITH_HMAC_HEX",
+                "description": "HMAC over the raw body using the shared secret"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"evt_01HZ8A1B2C3D4E5F6G7H8J9K0L\",\n  \"type\": \"TipReceived\",\n  \"tipId\": \"{{tipId}}\",\n  \"ledger\": 12345678,\n  \"timestamp\": \"2025-01-15T12:34:56Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stellar/contract/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["stellar", "contract", "webhook"]
+            },
+            "description": "Contract event ingestion endpoint. Required `x-stellar-signature` header must be an HMAC of the raw request body using the shared secret configured via env."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 401 Unauthorized', () => {",
+                  "  pm.expect([200, 401]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "description": "Liveness, readiness and Stellar remote probes. Throttle-exempt.",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Static liveness probe. Process liveness + uptime + version."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status === ok', () => pm.expect(body.data.status).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /health/ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            },
+            "description": "Readiness probe. Returns 200 only when Postgres is reachable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 503', () => {",
+                  "  pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /health/remote",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/remote",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "remote"]
+            },
+            "description": "External probe against the Stellar Horizon instance. Returns 503 if Horizon is unreachable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK or 503', () => {",
+                  "  pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Always advertise JSON to the server and tame the Accept header.",
+          "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level guard: any 5xx response fails the run.",
+          "if (pm.response.code >= 500) {",
+          "  pm.test('Server-side error (5xx)', () => pm.expect.fail(`Unexpected ${pm.response.code}: ${pm.response.status}`));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "publicUsername",
+      "value": "alice",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tipId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

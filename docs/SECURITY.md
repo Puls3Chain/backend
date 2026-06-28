@@ -58,3 +58,79 @@ Rules enforced on every text field:
 
 URL fields (avatarUrl, social links) are validated via `@IsUrl` with
 `protocols: ['https']` to reject `javascript:`, `data:`, and `vbscript:` schemes.
+
+## Dependency vulnerability management
+
+### Scanning pipeline
+
+| Stage                          | Tool                                       | Threshold | Trigger                                                 |
+| ------------------------------ | ------------------------------------------ | --------- | ------------------------------------------------------- |
+| PR / push to `main`            | `npm audit` (prod deps only)               | high +    | `.github/workflows/security-audit.yml` → `npm-audit`    |
+| PR / push to `main`            | CodeQL (`security-and-quality` query pack) | —         | `.github/workflows/security-audit.yml` → `codeql`       |
+| PR / push to `main` (opt-in)   | Snyk CLI (`snyk test` + `snyk code test`)  | high +    | `.github/workflows/security-audit.yml` → `snyk-test`    |
+| After merge to `main` (opt-in) | Snyk monitor (drift baseline)              | —         | `.github/workflows/security-audit.yml` → `snyk-monitor` |
+| Weekly cron                    | `npm audit` (full dep tree)                | high +    | `.github/workflows/security-drift.yml`                  |
+
+The PR-time `npm-audit` job omits devDependencies because most devDeps are
+not loaded at runtime. The weekly drift job audits the full tree.
+
+CodeQL results appear under the repository **Security** tab and on every
+PR via the **Files Changed → Code scanning alerts** view.
+
+### Merge policy
+
+- **Critical / high**: blocks the merge. The `npm-audit` (or `snyk-test`)
+  job fails the workflow and the PR cannot be merged until the dependency
+  is bumped or a documented suppression is added (see below). Both of those
+  changes must themselves pass the same gate for every other package.
+- **Medium**: tracked in the weekly drift report. Acknowledged in the
+  follow-up issue opened by `security-drift.yml`.
+- **Low / info**: ignored at gate-level. Surfaced in the Snyk dashboard
+  for awareness.
+
+### Response SLA
+
+| Severity | Mitigation target |
+| -------- | ----------------- |
+| Critical | ≤ 24 hours        |
+| High     | ≤ 7 days          |
+| Medium   | ≤ 30 days         |
+| Low      | Best-effort       |
+
+### Suppression policy (`.snyk`)
+
+A documented suppression is the **only** way to merge a known-vulnerable
+dependency. Each entry must include:
+
+- **`reason`** — explain why the vulnerability cannot affect this project
+  (e.g. used only by a dev-only code path, not loaded at runtime,
+  confidentiality impact exhausted by sanitization, etc.).
+- **`expires`** — ISO 8601 date, no more than 90 days out. Suppressions
+  expire by design to bound technical debt and force re-review.
+- **`created`** — ISO 8601 date when the entry was authored.
+
+The schema lives in `.snyk`. The file currently declares `ignore: {}` and
+`patch: {}` explicitly to make the all-active default auditable in code
+review.
+
+### Local reproduction
+
+```bash
+# High+ check, omitting dev deps (mirrors the CI gate)
+npm audit --audit-level=high --omit=dev
+# Same, but also audits devDependencies (mirrors the weekly drift job)
+npm audit --audit-level=high
+```
+
+### Weekly drift job
+
+`.github/workflows/security-drift.yml` runs every **Monday at 01:00 UTC**
+and also on `workflow_dispatch`.
+
+- The `drift-detect` job runs `npm audit --audit-level=high` against the
+  full dep tree and uploads the raw JSON as a workflow artifact (90-day
+  retention).
+- The `drift-issue` job opens (or keeps) a single `security`-labelled issue
+  describing the drift and closes any previous one when the next run is
+  clean. The job creates the `security` label defensively if it does not
+  exist yet, so the workflow never 422s on a fresh fork.
