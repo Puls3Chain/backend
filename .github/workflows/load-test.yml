@@ -42,6 +42,8 @@ jobs:
       JWT_SECRET: load-test-secret
       NODE_ENV: test
       PORT: 3000
+      DB_POOL_SIZE: 10
+      DB_POOL_SATURATION_CHECK_INTERVAL_MS: 5000
 
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +103,14 @@ jobs:
         with:
           filename: test/load/profile-reads.js
           flags: --out json=results/profile-reads.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Run database pool readiness test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: test/load/db-pool-readiness.js
+          flags: --out json=results/db-pool-readiness.json
         env:
           BASE_URL: http://localhost:3000
 

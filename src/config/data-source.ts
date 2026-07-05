@@ -1,5 +1,9 @@
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
+import {
+  DB_SLOW_QUERY_WARNING_MS,
+  createPostgresPoolOptions,
+} from './database-pool.config';
 
 dotenv.config();
 
@@ -15,6 +19,8 @@ export default new DataSource({
   migrationsTableName: 'typeorm_migrations',
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
+  maxQueryExecutionTime: DB_SLOW_QUERY_WARNING_MS,
+  extra: createPostgresPoolOptions(),
   // Wrap each migration in its own transaction by default so partial
   // failures roll back cleanly, while still letting individual migrations
   // opt out via `public readonly transaction = false` on the class.
