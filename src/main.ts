@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
 import { configureSecurity } from './config/security.config';
+import { startPostgresPoolSaturationMonitor } from './config/postgres-pool-monitor';
 import { StructuredLogger } from './shared/logging/logging.config';
 import {
   initSentry,
@@ -73,8 +74,14 @@ async function bootstrap(): Promise<void> {
     const port = process.env.PORT || 3000;
     await app.listen(port);
 
+    let poolSaturationMonitor: NodeJS.Timeout | undefined;
+
     // Graceful shutdown
     function shutdown(signal: string): void {
+      if (poolSaturationMonitor) {
+        clearInterval(poolSaturationMonitor);
+      }
+
       appLogger.log(
         `Received ${signal}, shutting down gracefully...`,
         'Bootstrap',
@@ -95,6 +102,10 @@ async function bootstrap(): Promise<void> {
     const dataSource = app.get(DataSource);
     if (dataSource.isInitialized) {
       appLogger.log('📦 Database connection established', 'Database');
+      poolSaturationMonitor = startPostgresPoolSaturationMonitor(
+        dataSource,
+        appLogger,
+      );
     }
     appLogger.log(
       `⚡ Application running on http://localhost:${port}`,

@@ -4,19 +4,20 @@ Load and performance testing for the StellarTip Backend API using [k6](https://k
 
 ## Thresholds
 
-| Metric | Threshold |
-|--------|-----------|
-| p95 response time | < 200ms |
-| Error rate | < 1% |
+| Metric            | Threshold |
+| ----------------- | --------- |
+| p95 response time | < 200ms   |
+| Error rate        | < 1%      |
 
 ## Load Envelope
 
-| Script | Endpoint | Target RPS | Duration | Pattern |
-|--------|----------|-----------|----------|---------|
-| `health-smoke.js` | `GET /health` | 1000 RPS | 30s | Constant |
-| `profile-reads.js` | `GET /profiles/:username` | 200 RPS | 5 min | Ramp up → sustain → ramp down |
-| `auth-rate-limit.js` | `POST /auth/login` | ~15 req/VU | 2 min | Per-VU (rate-limit verification) |
-| `tip-creation.js` | `POST /tips` | 50 RPS | 5 min | Ramp up → sustain → ramp down |
+| Script                 | Endpoint                  | Target RPS | Duration | Pattern                          |
+| ---------------------- | ------------------------- | ---------- | -------- | -------------------------------- |
+| `health-smoke.js`      | `GET /health`             | 1000 RPS   | 30s      | Constant                         |
+| `profile-reads.js`     | `GET /profiles/:username` | 200 RPS    | 5 min    | Ramp up → sustain → ramp down    |
+| `auth-rate-limit.js`   | `POST /auth/login`        | ~15 req/VU | 2 min    | Per-VU (rate-limit verification) |
+| `tip-creation.js`      | `POST /tips`              | 50 RPS     | 5 min    | Ramp up → sustain → ramp down    |
+| `db-pool-readiness.js` | `GET /health/ready`       | 400 RPS    | 2 min    | Constant DB readiness load       |
 
 ## Scripts
 
@@ -41,6 +42,32 @@ Each VU sends 15 requests (exceeding the 10 req/min limit), and the test asserts
 Burst test for tip creation at **50 RPS** for 5 minutes.  
 Ramp-up: 0 → 50 RPS over 30s. Ramp-down: 50 → 0 RPS over 30s.
 
+### `db-pool-readiness.js`
+
+Runs the database-backed readiness probe at **400 RPS** for 2 minutes, which is
+2x the profile-read baseline. It verifies that the tuned PostgreSQL pool keeps
+the database check connected with p95 latency below 250ms and fewer than 10
+failed readiness checks.
+
+## PostgreSQL Pool Tuning
+
+The API configures the TypeORM PostgreSQL pool explicitly instead of relying on
+driver defaults:
+
+| Setting                                | Default | Notes                                                     |
+| -------------------------------------- | ------- | --------------------------------------------------------- |
+| `DB_POOL_SIZE`                         | `10`    | Clamped to a maximum of `20` connections per API instance |
+| `idleTimeoutMillis`                    | `30000` | Releases idle clients after 30 seconds                    |
+| `connectionTimeoutMillis`              | `5000`  | Fails fast when a client cannot be acquired               |
+| `maxQueryExecutionTime`                | `1000`  | Emits slow-query warnings above 1 second                  |
+| `DB_POOL_SATURATION_CHECK_INTERVAL_MS` | `30000` | Warn-level pool saturation check interval                 |
+
+Pool saturation is logged at warn level when requests are waiting for a
+connection, or when all configured clients are busy with no idle capacity. Size
+`DB_POOL_SIZE` per instance against the database's global connection budget. For
+example, four API instances at the default size consume up to 40 database
+connections before migrations, admin sessions, or background jobs are counted.
+
 ## Running Locally
 
 Requires [k6](https://k6.io/docs/get-started/installation/) or Docker.
@@ -57,6 +84,9 @@ k6 run --env BASE_URL=http://localhost:3000 test/load/profile-reads.js
 
 # Save JSON output for trend tracking
 k6 run --out json=results.json test/load/tip-creation.js
+
+# Verify database pool behavior under 2x readiness load
+k6 run --env BASE_URL=http://localhost:3000 test/load/db-pool-readiness.js
 ```
 
 ## CI

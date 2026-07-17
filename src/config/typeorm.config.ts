@@ -1,5 +1,9 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
+import {
+  DB_SLOW_QUERY_WARNING_MS,
+  createPostgresPoolOptions,
+} from './database-pool.config';
 
 dotenv.config();
 
@@ -19,6 +23,8 @@ const config: TypeOrmModuleOptions = {
   synchronize: !isProduction,
   logging: !isProduction,
   logger: 'advanced-console',
+  maxQueryExecutionTime: DB_SLOW_QUERY_WARNING_MS,
+  extra: createPostgresPoolOptions(),
   autoLoadEntities: true,
   // See `src/config/data-source.ts` for the rationale. This keeps the
   // production bootstrap (`migrationsRun: isProduction`) consistent with
